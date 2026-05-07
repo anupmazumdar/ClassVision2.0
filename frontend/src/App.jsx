@@ -7,6 +7,7 @@ import Students from "./pages/Students";
 import RegisterStudent from "./pages/RegisterStudent";
 import Session from "./pages/Session";
 import Reports from "./pages/Reports";
+import Users from "./pages/Users";
 import NavBar from "./components/NavBar";
 
 // ── Auth context ──────────────────────────────────────────────────────────────
@@ -99,6 +100,14 @@ export default function App() {
             element={
               <Protected>
                 <Reports />
+              </Protected>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <Protected>
+                <Users />
               </Protected>
             }
           />

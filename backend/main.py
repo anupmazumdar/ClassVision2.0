@@ -341,6 +341,217 @@ def mark_attendance(
 
 # ── Reports ───────────────────────────────────────────────────────────────────
 
+# ── Users (admin) ─────────────────────────────────────────────────────────────
+
+@app.get("/users")
+def list_users(db: Session = Depends(get_db), _=Depends(require_admin)):
+    users = db.query(User).order_by(User.name).all()
+    return [
+        {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "created_at": u.created_at.isoformat()}
+        for u in users
+    ]
+
+
+@app.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: int, db: Session = Depends(get_db), current: dict = Depends(require_admin)):
+    if str(user_id) == current["sub"]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+
+
+# ── Attendance: manual unmark ─────────────────────────────────────────────────
+
+@app.delete("/attendance/{session_id}/unmark/{student_id}", status_code=204)
+def unmark_attendance(session_id: int, student_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    record = db.query(AttendanceRecord).filter(
+        AttendanceRecord.session_id == session_id,
+        AttendanceRecord.student_id == student_id,
+    ).first()
+    if record:
+        db.delete(record)
+        db.commit()
+
+
+# ── Reports: student-wise summary ────────────────────────────────────────────
+
+@app.get("/reports/student-summary")
+def student_summary(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    total = db.query(ClassSession).filter(ClassSession.is_active == False).count()
+    students = db.query(Student).order_by(Student.name).all()
+    rows = []
+    for s in students:
+        present = db.query(AttendanceRecord).filter(AttendanceRecord.student_id == s.id).count()
+        rows.append({
+            "id": s.id,
+            "name": s.name,
+            "enrollment": s.enrollment,
+            "department": s.department,
+            "present": present,
+            "total": total,
+            "pct": round(present / total * 100, 1) if total > 0 else 0,
+        })
+    return {"total_sessions": total, "students": sorted(rows, key=lambda x: x["pct"], reverse=True)}
+
+
+# ── Reports: PDF ──────────────────────────────────────────────────────────────
+
+@app.get("/reports/{session_id}/pdf")
+def export_pdf(session_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        raise HTTPException(status_code=500, detail="fpdf2 not installed")
+
+    session = db.query(ClassSession).filter(ClassSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    records = (
+        db.query(AttendanceRecord, Student)
+        .join(Student, AttendanceRecord.student_id == Student.id)
+        .filter(AttendanceRecord.session_id == session_id)
+        .order_by(Student.name)
+        .all()
+    )
+    total_students = db.query(Student).count()
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    pdf.set_fill_color(30, 58, 95)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 17)
+    pdf.cell(0, 13, "ClassVision — Attendance Report", fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+
+    pdf.set_text_color(40, 40, 40)
+    info = [
+        ("Subject", session.subject),
+        ("Room", session.room or "—"),
+        ("Date", session.started_at.strftime("%d %B %Y")),
+        ("Time", session.started_at.strftime("%H:%M") + (" — " + session.ended_at.strftime("%H:%M") if session.ended_at else "")),
+        ("Present", f"{len(records)} / {total_students}  ({round(len(records)/max(total_students,1)*100,1)}%)"),
+    ]
+    for label, val in info:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(38, 8, label + ":", new_x="RIGHT", new_y="TOP")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 8, val, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    # Table header
+    pdf.set_fill_color(30, 58, 95)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 9)
+    col_w = [10, 42, 72, 40, 26]
+    for txt, w in zip(["#", "Enrollment", "Name", "Department", "Conf%"], col_w):
+        pdf.cell(w, 8, txt, fill=True, border=1, align="C")
+    pdf.ln()
+
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_font("Helvetica", "", 9)
+    for i, (r, s) in enumerate(records, 1):
+        pdf.set_fill_color(245, 247, 252) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        for txt, w in zip([str(i), s.enrollment, s.name, s.department or "—", f"{round(r.confidence,1)}%"], col_w):
+            pdf.cell(w, 7, txt, fill=True, border=1)
+        pdf.ln()
+
+    buf = io.BytesIO(pdf.output())
+    fname = f"attendance_{session.subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.pdf"
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+# ── Reports: email ────────────────────────────────────────────────────────────
+
+class EmailRequest(BaseModel):
+    to: str
+
+
+@app.post("/reports/{session_id}/email")
+def email_report(session_id: int, body: EmailRequest, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders as email_encoders
+
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        raise HTTPException(status_code=503, detail="Email not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS to .env")
+
+    session = db.query(ClassSession).filter(ClassSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    records = (
+        db.query(AttendanceRecord, Student)
+        .join(Student, AttendanceRecord.student_id == Student.id)
+        .filter(AttendanceRecord.session_id == session_id)
+        .order_by(Student.name)
+        .all()
+    )
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not installed")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Attendance"
+    hfill = PatternFill("solid", fgColor="1e3a5f")
+    hfont = Font(bold=True, color="FFFFFF")
+    for col, h in enumerate(["#", "Enrollment", "Name", "Department", "Confidence %", "Marked At"], 1):
+        c = ws.cell(row=1, column=col, value=h)
+        c.font = hfont
+        c.fill = hfill
+        c.alignment = Alignment(horizontal="center")
+    for i, (r, s) in enumerate(records, 1):
+        ws.append([i, s.enrollment, s.name, s.department, round(r.confidence, 1), r.marked_at.strftime("%Y-%m-%d %H:%M:%S")])
+
+    excel_buf = io.BytesIO()
+    wb.save(excel_buf)
+    excel_buf.seek(0)
+
+    msg = MIMEMultipart()
+    msg["From"] = smtp_from
+    msg["To"] = body.to
+    msg["Subject"] = f"Attendance — {session.subject} ({session.started_at.strftime('%d %b %Y')})"
+    msg.attach(MIMEText(
+        f"Subject: {session.subject}\nDate: {session.started_at.strftime('%d %B %Y')}\n"
+        f"Present: {len(records)}\n\nAttendance report attached.\n\n— ClassVision",
+        "plain"
+    ))
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(excel_buf.read())
+    email_encoders.encode_base64(part)
+    fname = f"attendance_{session.subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.xlsx"
+    part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+    msg.attach(part)
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.login(smtp_user, smtp_pass)
+            srv.sendmail(smtp_from, body.to, msg.as_string())
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to send email: {e}")
+
+    return {"message": f"Report sent to {body.to}"}
+
+
 @app.get("/reports/{session_id}/excel")
 def export_excel(session_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
     try:

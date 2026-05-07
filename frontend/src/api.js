@@ -66,7 +66,41 @@ export const markAttendance = (sessionId, studentId, confidence) =>
     .post(`/attendance/${sessionId}/mark`, { student_id: studentId, confidence })
     .then((r) => r.data);
 
+// ── Attendance: unmark ────────────────────────────────────────────────────────
+export const unmarkAttendance = (sessionId, studentId) =>
+  client.delete(`/attendance/${sessionId}/unmark/${studentId}`);
+
+// ── Users (admin) ─────────────────────────────────────────────────────────────
+export const getUsers = () => client.get("/users").then((r) => r.data);
+
+export const registerUser = (data) =>
+  client.post("/auth/register", data).then((r) => r.data);
+
+export const deleteUser = (userId) => client.delete(`/users/${userId}`);
+
 // ── Reports ───────────────────────────────────────────────────────────────────
+export const getStudentSummary = () =>
+  client.get("/reports/student-summary").then((r) => r.data);
+
+export const emailReport = (sessionId, to) =>
+  client.post(`/reports/${sessionId}/email`, { to }).then((r) => r.data);
+
+export const downloadPdf = (sessionId) => {
+  const token = localStorage.getItem("cv_token");
+  const url = `${BASE_URL}/reports/${sessionId}/pdf`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then((res) => res.blob())
+    .then((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `attendance_${sessionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    });
+};
+
 export const downloadExcel = (sessionId) => {
   const token = localStorage.getItem("cv_token");
   const url = `${BASE_URL}/reports/${sessionId}/excel`;

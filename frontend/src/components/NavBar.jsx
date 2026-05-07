@@ -3,10 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import {
   LayoutDashboard, Users, Video, FileText,
-  LogOut, Menu, X, GraduationCap,
+  LogOut, Menu, X, GraduationCap, UserCog,
 } from "lucide-react";
 
-const links = [
+const baseLinks = [
   { to: "/",         label: "Dashboard", icon: LayoutDashboard },
   { to: "/students", label: "Students",  icon: Users },
   { to: "/reports",  label: "Reports",   icon: FileText },
@@ -17,6 +17,9 @@ export default function NavBar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const links = user?.role === "admin"
+    ? [...baseLinks, { to: "/users", label: "Users", icon: UserCog }]
+    : baseLinks;
 
   const handleSignOut = () => {
     signOut();
