@@ -1,0 +1,35 @@
+.env
+*.pyc
+__pycache__/
+.DS_Store
+
+# Large ML files
+ml_models/TrainingImage/
+ml_models/TrainingImageLabel/*.pkl
+ml_models/TrainingImageLabel/*.yml
+
+# Local DB + student data (privacy)
+database/local.db
+StudentDetails/studentdetails.csv
+Attendance/
+Reports/
+
+# Node
+node_modules/
+frontend/node_modules/
+web/node_modules/
+mobile/node_modules/
+frontend/dist/
+web/dist/
+
+# Python venv
+.venv/
+venv/
+env/
+
+# DB file (runtime data)
+backend/classvision.db
+*.db
+
+.vscode/
+.idea/

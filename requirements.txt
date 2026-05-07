@@ -1,0 +1,29 @@
+# ML
+face_recognition
+deepface
+mediapipe
+opencv-python
+opencv-contrib-python
+numpy
+Pillow
+
+# Backend
+fastapi
+uvicorn[standard]
+sqlalchemy
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pydantic
+python-dotenv
+
+# Cloud
+supabase
+
+# Reports
+reportlab
+openpyxl
+
+# Data + UI
+pandas
+pyttsx3
