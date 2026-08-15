@@ -1,11 +1,12 @@
-import cv2
-import numpy as np
 import base64
+import io
 import json
 import os
-from PIL import Image
-import io
 from typing import List
+
+import cv2
+import numpy as np
+from PIL import Image
 
 _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 _FACE_SIZE = (64, 64)
@@ -31,7 +32,7 @@ def _hog_vec(gray_face: np.ndarray) -> np.ndarray:
 def _face_vecs(rgb: np.ndarray) -> List[np.ndarray]:
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     faces = _CASCADE.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-    return [_hog_vec(gray[y:y + h, x:x + w]) for (x, y, w, h) in faces]
+    return [_hog_vec(gray[y : y + h, x : x + w]) for (x, y, w, h) in faces]
 
 
 def extract_encodings(image_array: np.ndarray) -> List[List[float]]:
@@ -75,11 +76,13 @@ def recognize_faces(image_array: np.ndarray, students: list) -> List[dict]:
             student = known_owners[best_idx]
             if student.id not in seen_ids:
                 seen_ids.add(student.id)
-                results.append({
-                    "student_id": student.id,
-                    "name": student.name,
-                    "enrollment": student.enrollment,
-                    "confidence": round(best_sim * 100, 1),
-                })
+                results.append(
+                    {
+                        "student_id": student.id,
+                        "name": student.name,
+                        "enrollment": student.enrollment,
+                        "confidence": round(best_sim * 100, 1),
+                    }
+                )
 
     return results

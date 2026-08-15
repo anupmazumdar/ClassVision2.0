@@ -1,4 +1,4 @@
-from middleware.jwt_middleware import (
+from .jwt_middleware import (
     create_token,
     decode_token,
     get_current_user,
