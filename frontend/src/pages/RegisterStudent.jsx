@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera as CameraIcon, CheckCircle, Loader2, Trash2, UserPlus } from "lucide-react";
 import Camera from "../components/Camera";
-import { createStudent, registerFace } from "../api";
+import { createStudent, registerFace } from "../api/client";
 
 export default function RegisterStudent() {
   const navigate = useNavigate();

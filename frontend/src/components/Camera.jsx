@@ -129,7 +129,23 @@ const Camera = forwardRef(function Camera(
     return canvas.toDataURL("image/jpeg", 0.85);
   };
 
-  useImperativeHandle(ref, () => ({ capture: captureFrame, stop: stopCamera }));
+  const captureSequence = async (count = 2, delayMs = 250) => {
+    const frames = [];
+    for (let i = 0; i < count; i++) {
+      const frame = captureFrame();
+      if (frame) frames.push(frame);
+      if (i < count - 1) {
+        await new Promise((res) => setTimeout(res, delayMs));
+      }
+    }
+    return frames;
+  };
+
+  useImperativeHandle(ref, () => ({
+    capture: captureFrame,
+    captureSequence,
+    stop: stopCamera,
+  }));
 
   const applyIpCamera = () => {
     if (!ipInput.trim()) return;

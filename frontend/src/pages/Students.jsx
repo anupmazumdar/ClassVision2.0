@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserPlus, Search, CheckCircle, AlertCircle, Trash2, Loader2 } from "lucide-react";
-import { getStudents, deleteStudent } from "../api";
+import { getStudents, deleteStudent } from "../api/client";
 import { useAuth } from "../App";
 
 export default function Students() {

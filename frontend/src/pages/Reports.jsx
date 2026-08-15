@@ -6,7 +6,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import { getSessions, getSession, downloadExcel, downloadPdf, getStudentSummary, emailReport } from "../api";
+import { getSessions, getSession, downloadExcel, downloadPdf, getStudentSummary, emailReport } from "../api/client";
 
 export default function Reports() {
   const [tab, setTab] = useState("sessions"); // sessions | chart

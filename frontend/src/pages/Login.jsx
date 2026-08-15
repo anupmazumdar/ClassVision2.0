@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GraduationCap, Loader2 } from "lucide-react";
-import { login } from "../api";
+import { login } from "../api/client";
 import { useAuth } from "../App";
 
 export default function Login() {

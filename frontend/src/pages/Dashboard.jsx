@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Users, Video, CheckCircle, Clock,
-  Plus, Play, Loader2, BookOpen, Trash2,
+  Users,
+  Video,
+  CheckCircle,
+  Clock,
+  Plus,
+  Play,
+  Loader2,
+  BookOpen,
+  Trash2,
+  KeyRound,
+  MapPin,
+  ShieldCheck,
 } from "lucide-react";
-import { getSessions, startSession, getStudents, deleteSession } from "../api";
+import { getSessions, startSession, getStudents, deleteSession } from "../api/client";
 import { useAuth } from "../App";
 
 export default function Dashboard() {
@@ -14,7 +24,16 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [studentCount, setStudentCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [startForm, setStartForm] = useState({ show: false, subject: "", room: "" });
+  const [startForm, setStartForm] = useState({
+    show: false,
+    subject: "",
+    room: "",
+    require_code: false,
+    enable_geofence: false,
+    room_lat: null,
+    room_lng: null,
+    radius_meters: 100,
+  });
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
@@ -26,13 +45,47 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleToggleGeofence = (e) => {
+    const checked = e.target.checked;
+    if (checked && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setStartForm((prev) => ({
+            ...prev,
+            enable_geofence: true,
+            room_lat: pos.coords.latitude,
+            room_lng: pos.coords.longitude,
+          }));
+        },
+        () => {
+          alert("Location access denied or unavailable.");
+          setStartForm((prev) => ({ ...prev, enable_geofence: false }));
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      setStartForm((prev) => ({
+        ...prev,
+        enable_geofence: false,
+        room_lat: null,
+        room_lng: null,
+      }));
+    }
+  };
+
   const handleStart = async (e) => {
     e.preventDefault();
     setStarting(true);
     try {
-      const session = await startSession(startForm.subject, startForm.room);
+      const session = await startSession(startForm.subject, startForm.room, {
+        room_lat: startForm.enable_geofence ? startForm.room_lat : null,
+        room_lng: startForm.enable_geofence ? startForm.room_lng : null,
+        radius_meters: startForm.radius_meters || 100,
+        require_code: startForm.require_code,
+      });
       navigate(`/session/${session.id}`);
-    } catch {
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to start session.");
       setStarting(false);
     }
   };
@@ -64,7 +117,18 @@ export default function Dashboard() {
         </div>
         <button
           className="btn-primary flex items-center gap-2"
-          onClick={() => setStartForm({ show: true, subject: "", room: "" })}
+          onClick={() =>
+            setStartForm({
+              show: true,
+              subject: "",
+              room: "",
+              require_code: false,
+              enable_geofence: false,
+              room_lat: null,
+              room_lng: null,
+              radius_meters: 100,
+            })
+          }
         >
           <Plus size={16} /> New Session
         </button>
@@ -115,7 +179,7 @@ export default function Dashboard() {
       {startForm.show && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="card w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Start New Session</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-100">Start New Session</h2>
             <form onSubmit={handleStart} className="space-y-4">
               <div>
                 <label className="label">Subject *</label>
@@ -137,16 +201,69 @@ export default function Dashboard() {
                   onChange={(e) => setStartForm({ ...startForm, room: e.target.value })}
                 />
               </div>
+
+              {/* Priority 1 Security Options */}
+              <div className="p-3 bg-gray-900/70 border border-gray-800 rounded-xl space-y-2.5 text-xs">
+                <p className="font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-indigo-400" /> Security & Anti-Proxy Options
+                </p>
+
+                <label className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={startForm.require_code}
+                    onChange={(e) => setStartForm({ ...startForm, require_code: e.target.checked })}
+                    className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
+                  />
+                  <KeyRound size={13} className="text-amber-400" />
+                  <span>Require 30s Rotating Session Code</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={startForm.enable_geofence}
+                    onChange={handleToggleGeofence}
+                    className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
+                  />
+                  <MapPin size={13} className="text-blue-400" />
+                  <span>
+                    GPS Geofencing Lock {startForm.room_lat ? `(GPS Locked)` : `(100m)`}
+                  </span>
+                </label>
+              </div>
+
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
                   className="btn-secondary flex-1"
-                  onClick={() => setStartForm({ show: false, subject: "", room: "" })}
+                  onClick={() =>
+                    setStartForm({
+                      show: false,
+                      subject: "",
+                      room: "",
+                      require_code: false,
+                      enable_geofence: false,
+                      room_lat: null,
+                      room_lng: null,
+                      radius_meters: 100,
+                    })
+                  }
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={starting}>
-                  {starting ? <><Loader2 size={15} className="animate-spin" /> Starting…</> : "Start Session"}
+                <button
+                  type="submit"
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  disabled={starting}
+                >
+                  {starting ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" /> Starting…
+                    </>
+                  ) : (
+                    "Start Session"
+                  )}
                 </button>
               </div>
             </form>
@@ -177,10 +294,22 @@ export default function Dashboard() {
                   )}
                   <div className="min-w-0">
                     <p className="font-medium text-gray-200 truncate">{s.subject}</p>
-                    <p className="text-xs text-gray-500">
-                      {s.room && `${s.room} · `}
-                      {new Date(s.started_at).toLocaleDateString()} ·{" "}
-                      {new Date(s.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    <p className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                      {s.room && <span>{s.room}</span>}
+                      <span>{new Date(s.started_at).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(s.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {s.require_code && (
+                        <span className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/60 px-1.5 py-0.2 rounded">
+                          Rolling Code
+                        </span>
+                      )}
+                      {s.room_lat && (
+                        <span className="text-[10px] text-blue-400 bg-blue-950/60 border border-blue-800/60 px-1.5 py-0.2 rounded">
+                          Geofenced
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -211,9 +340,9 @@ export default function Dashboard() {
 function StatCard({ icon, label, value, color }) {
   const colors = {
     indigo: "text-indigo-400 bg-indigo-900/30",
-    blue:   "text-blue-400 bg-blue-900/30",
-    green:  "text-green-400 bg-green-900/30",
-    amber:  "text-amber-400 bg-amber-900/30",
+    blue: "text-blue-400 bg-blue-900/30",
+    green: "text-green-400 bg-green-900/30",
+    amber: "text-amber-400 bg-amber-900/30",
   };
   return (
     <div className="card flex items-center gap-3">

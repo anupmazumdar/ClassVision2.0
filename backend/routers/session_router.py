@@ -20,7 +20,24 @@ def start_session(
     db: Session = Depends(get_db),
     current: dict = Depends(get_current_user),
 ):
-    return session_service.start_session(db, body.subject, body.room, int(current["sub"]))
+    return session_service.start_session(
+        db,
+        subject=body.subject,
+        room=body.room,
+        teacher_id=int(current["sub"]),
+        room_lat=body.room_lat,
+        room_lng=body.room_lng,
+        radius_meters=body.radius_meters or 100.0,
+        require_code=bool(body.require_code),
+    )
+
+
+@router.get("/{session_id}/code")
+def get_session_code(
+    session_id: int,
+    _: dict = Depends(get_current_user),
+):
+    return session_service.get_current_session_code(session_id)
 
 
 @router.put("/{session_id}/stop")

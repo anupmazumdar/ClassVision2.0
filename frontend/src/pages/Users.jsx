@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { UserCog, UserPlus, Trash2, Loader2, Shield, BookOpen } from "lucide-react";
-import { getUsers, registerUser, deleteUser } from "../api";
+import { getUsers, registerUser, deleteUser } from "../api/client";
 import { useAuth } from "../App";
 import { useNavigate } from "react-router-dom";
 

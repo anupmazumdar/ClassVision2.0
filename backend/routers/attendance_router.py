@@ -15,7 +15,7 @@ def recognize(
     db: Session = Depends(get_db),
     _: dict = Depends(get_current_user),
 ):
-    return attendance_service.recognize(db, body.image)
+    return attendance_service.recognize(db, body.image, frames=body.frames)
 
 
 @router.post("/{session_id}/mark", status_code=201)
@@ -25,7 +25,17 @@ def mark_attendance(
     db: Session = Depends(get_db),
     _: dict = Depends(get_current_user),
 ):
-    return attendance_service.mark_attendance(db, session_id, body.student_id, body.confidence)
+    return attendance_service.mark_attendance(
+        db,
+        session_id=session_id,
+        student_id=body.student_id,
+        confidence=body.confidence,
+        lat=body.lat,
+        lng=body.lng,
+        code=body.code,
+        device_id=body.device_id,
+        frames=body.frames,
+    )
 
 
 @router.delete("/{session_id}/unmark/{student_id}", status_code=204)

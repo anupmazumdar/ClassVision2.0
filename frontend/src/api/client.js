@@ -39,8 +39,20 @@ export const deleteStudent = (studentId) => client.delete(`/students/${studentId
 
 export const getSessions = () => client.get("/sessions").then((r) => r.data);
 
-export const startSession = (subject, room) =>
-  client.post("/sessions", { subject, room }).then((r) => r.data);
+export const startSession = (subject, room, extra = {}) =>
+  client
+    .post("/sessions", {
+      subject,
+      room,
+      room_lat: extra.room_lat ?? null,
+      room_lng: extra.room_lng ?? null,
+      radius_meters: extra.radius_meters ?? 100.0,
+      require_code: extra.require_code ?? false,
+    })
+    .then((r) => r.data);
+
+export const getSessionCode = (sessionId) =>
+  client.get(`/sessions/${sessionId}/code`).then((r) => r.data);
 
 export const stopSession = (sessionId) =>
   client.put(`/sessions/${sessionId}/stop`).then((r) => r.data);
@@ -50,12 +62,20 @@ export const getSession = (sessionId) =>
 
 export const deleteSession = (sessionId) => client.delete(`/sessions/${sessionId}`);
 
-export const recognizeFaces = (image) =>
-  client.post("/attendance/recognize", { image }).then((r) => r.data);
+export const recognizeFaces = (image, frames = null) =>
+  client.post("/attendance/recognize", { image, frames }).then((r) => r.data);
 
-export const markAttendance = (sessionId, studentId, confidence) =>
+export const markAttendance = (sessionId, studentId, confidence, extra = {}) =>
   client
-    .post(`/attendance/${sessionId}/mark`, { student_id: studentId, confidence })
+    .post(`/attendance/${sessionId}/mark`, {
+      student_id: studentId,
+      confidence,
+      lat: extra.lat ?? null,
+      lng: extra.lng ?? null,
+      code: extra.code ?? null,
+      device_id: extra.device_id ?? null,
+      frames: extra.frames ?? null,
+    })
     .then((r) => r.data);
 
 export const unmarkAttendance = (sessionId, studentId) =>

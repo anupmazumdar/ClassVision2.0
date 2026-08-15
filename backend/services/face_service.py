@@ -2,7 +2,7 @@ import base64
 import io
 import json
 import os
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -86,3 +86,72 @@ def recognize_faces(image_array: np.ndarray, students: list) -> List[dict]:
                 )
 
     return results
+
+
+def verify_liveness(frames: List[np.ndarray]) -> Dict:
+    """
+    Validates anti-spoofing liveness by analyzing consecutive burst frames.
+    Checks:
+      1. Minimum 2 frames present
+      2. Faces detected in frames
+      3. Frame difference / micro-motion delta (rejects static photos and clones)
+      4. Texture and Laplacian variance (rejects flat low-resolution screen replays)
+    """
+    if not frames or len(frames) < 2:
+        return {"is_live": False, "reason": "At least 2 burst frames required for liveness verification."}
+
+    grays = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in frames]
+
+    # Check 1: Face detection across frames
+    detected_faces = []
+    for gray in grays:
+        faces = _CASCADE.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        if len(faces) == 0:
+            return {"is_live": False, "reason": "Face not continuously detected across burst frames."}
+        detected_faces.append(faces[0])
+
+    # Check 2: Micro-motion delta between consecutive frames
+    diffs = []
+    for i in range(len(grays) - 1):
+        # Resize to same dimension if needed
+        g1 = cv2.resize(grays[i], (320, 240))
+        g2 = cv2.resize(grays[i + 1], (320, 240))
+        diff = cv2.absdiff(g1, g2)
+        mean_diff = float(np.mean(diff))
+        diffs.append(mean_diff)
+
+    avg_diff = sum(diffs) / len(diffs)
+
+    # Static photo check: exact duplicate frames (pixel delta < 0.6)
+    if avg_diff < 0.6:
+        return {
+            "is_live": False,
+            "score": round(avg_diff, 2),
+            "reason": "Static photo detected. Please blink or naturally move slightly in front of the camera.",
+        }
+
+    # Extreme motion/scene switch check
+    if avg_diff > 120.0:
+        return {
+            "is_live": False,
+            "score": round(avg_diff, 2),
+            "reason": "Excessive camera shake or scene transition detected.",
+        }
+
+    # Check 3: Texture & Blur analysis via Laplacian variance
+    lap_vars = [cv2.Laplacian(g, cv2.CV_64F).var() for g in grays]
+    avg_lap = sum(lap_vars) / len(lap_vars)
+
+    if avg_lap < 15.0:
+        return {
+            "is_live": False,
+            "score": round(avg_lap, 2),
+            "reason": "Image too blurry or degraded for anti-spoofing verification.",
+        }
+
+    return {
+        "is_live": True,
+        "motion_score": round(avg_diff, 2),
+        "texture_score": round(avg_lap, 2),
+        "message": "Liveness check passed.",
+    }

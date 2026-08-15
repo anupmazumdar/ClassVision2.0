@@ -13,4 +13,5 @@ class Student(Base):
     name = Column(String, nullable=False)
     department = Column(String, default="")
     face_encodings = Column(Text, default="[]")
+    device_id = Column(String, nullable=True)  # Bound device identifier
     created_at = Column(DateTime, default=datetime.utcnow)
