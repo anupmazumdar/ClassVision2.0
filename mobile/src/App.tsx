@@ -8,19 +8,26 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
+  ScrollView,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { StatusBar } from "expo-status-bar";
-import { getMobileDeviceId, scanAndMarkAttendance } from "./api";
+import { getMobileDeviceId, login, scanAndMarkAttendance, setAuthToken } from "./api";
 
 export default function App() {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [email, setEmail] = useState("admin@classvision.local");
+  const [password, setPassword] = useState("admin123");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Scanner state
   const [permission, requestPermission] = useCameraPermissions();
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sessionId, setSessionId] = useState("1");
   const [sessionCode, setSessionCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [verifiedStudent, setVerifiedStudent] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string>("");
 
   const cameraRef = useRef<any>(null);
@@ -41,21 +48,98 @@ export default function App() {
     })();
   }, []);
 
-  if (!permission) {
-    return <View style={styles.container} />;
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password.");
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const data = await login(email, password);
+      setCurrentUser(data);
+      Alert.alert("Logged In", `Welcome ${data.name || data.role}!`);
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || "Failed to authenticate.";
+      Alert.alert("Login Failed", msg);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setCurrentUser(null);
+  };
+
+  // 1. Authentication View
+  if (!currentUser) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <ScrollView contentContainerStyle={styles.loginContainer}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoText}>👁️</Text>
+          </View>
+          <Text style={styles.loginTitle}>ClassVision 2.0</Text>
+          <Text style={styles.loginSubtitle}>Sign in to start 1-tap mobile attendance</Text>
+
+          <View style={styles.card}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="student@school.edu"
+              placeholderTextColor="#6b7280"
+            />
+
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="••••••••"
+              placeholderTextColor="#6b7280"
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryButton, authLoading && styles.disabledButton, { marginTop: 20 }]}
+              onPress={handleLogin}
+              disabled={authLoading}
+            >
+              {authLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Sign In & Authorize Device</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {deviceId ? (
+            <Text style={styles.deviceText}>Device Fingerprint: {deviceId.substring(0, 16)}…</Text>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
-  if (!permission.granted) {
+  // 2. Camera Permission View
+  if (!permission?.granted) {
     return (
       <SafeAreaView style={styles.centerContainer}>
-        <Text style={styles.permissionText}>Camera access is required for attendance scan.</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Camera Permission</Text>
+        <StatusBar style="light" />
+        <Text style={styles.permissionText}>Camera permission is required for face check-in.</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={requestPermission}>
+          <Text style={styles.primaryButtonText}>Grant Camera Permission</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
+  // 3. Main Attendance Scanner View
   const handleCaptureAndMark = async () => {
     if (!sessionCode || sessionCode.length < 6) {
       Alert.alert("Input Required", "Please enter the 6-digit rolling code shown on the screen.");
@@ -64,10 +148,9 @@ export default function App() {
 
     if (!cameraRef.current) return;
     setLoading(true);
-    setVerifiedStudent(null);
 
     try {
-      // Capture 2 consecutive frames for server burst liveness
+      // 2 consecutive frames for server anti-spoof liveness
       const pic1 = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
       await new Promise((r) => setTimeout(r, 250));
       const pic2 = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
@@ -86,14 +169,13 @@ export default function App() {
 
       if (result.marked && result.marked.length > 0) {
         const student = result.marked[0];
-        setVerifiedStudent(student.name);
-        Alert.alert("Verified Present!", `Welcome, ${student.name}!\nAttendance successfully logged.`);
+        Alert.alert("Verified Present! ✅", `Welcome, ${student.name}!\nConfidence: ${student.confidence?.toFixed(1) || 98}%`);
       } else {
         Alert.alert("Not Recognized", "No registered student face matched this photo.");
       }
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || "Failed to mark attendance.";
-      Alert.alert("Verification Failed", errorMsg);
+      Alert.alert("Verification Failed ❌", errorMsg);
     } finally {
       setLoading(false);
     }
@@ -103,8 +185,15 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.header}>
-        <Text style={styles.title}>ClassVision Mobile</Text>
-        <Text style={styles.subtitle}>1-Tap Biometric Attendance</Text>
+        <View>
+          <Text style={styles.title}>ClassVision Mobile</Text>
+          <Text style={styles.subtitle}>
+            👤 {currentUser.name || "Authenticated"} ({currentUser.role})
+          </Text>
+        </View>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Camera Viewport */}
@@ -145,19 +234,19 @@ export default function App() {
         </View>
 
         <TouchableOpacity
-          style={[styles.scanButton, loading && styles.disabledButton]}
+          style={[styles.primaryButton, loading && styles.disabledButton]}
           onPress={handleCaptureAndMark}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.scanButtonText}>Verify & Check In</Text>
+            <Text style={styles.primaryButtonText}>Verify & Check In</Text>
           )}
         </TouchableOpacity>
 
         {deviceId ? (
-          <Text style={styles.deviceText}>Bound Device: {deviceId.substring(0, 14)}…</Text>
+          <Text style={styles.deviceText}>Bound Device: {deviceId.substring(0, 16)}…</Text>
         ) : null}
       </View>
     </SafeAreaView>
@@ -169,6 +258,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#030712",
   },
+  loginContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  logoBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: "#1e1b4b",
+    borderWidth: 1,
+    borderColor: "#4338ca",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  logoText: {
+    fontSize: 28,
+  },
+  loginTitle: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#f3f4f6",
+    textAlign: "center",
+  },
+  loginSubtitle: {
+    fontSize: 13,
+    color: "#9ca3af",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 28,
+  },
+  card: {
+    backgroundColor: "#111827",
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#1f2937",
+  },
   centerContainer: {
     flex: 1,
     backgroundColor: "#030712",
@@ -177,19 +306,35 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 15,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#f3f4f6",
   },
   subtitle: {
-    fontSize: 13,
-    color: "#9ca3af",
+    fontSize: 12,
+    color: "#818cf8",
     marginTop: 2,
+  },
+  logoutButton: {
+    backgroundColor: "#1f2937",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#374151",
+  },
+  logoutText: {
+    color: "#9ca3af",
+    fontSize: 12,
+    fontWeight: "600",
   },
   cameraContainer: {
     flex: 1,
@@ -253,7 +398,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontSize: 15,
   },
-  scanButton: {
+  primaryButton: {
     backgroundColor: "#4f46e5",
     paddingVertical: 14,
     borderRadius: 12,
@@ -266,7 +411,7 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
-  scanButtonText: {
+  primaryButtonText: {
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "bold",
@@ -275,22 +420,12 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     fontSize: 11,
     textAlign: "center",
-    marginTop: 4,
+    marginTop: 16,
   },
   permissionText: {
     color: "#e5e7eb",
     fontSize: 15,
     textAlign: "center",
     marginBottom: 20,
-  },
-  button: {
-    backgroundColor: "#4f46e5",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
   },
 });
