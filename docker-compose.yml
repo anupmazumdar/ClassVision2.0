@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: classvision_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - JWT_SECRET=${JWT_SECRET:-generate_with_scripts_generate_secrets_py}
+      - SESSION_CODE_SECRET=${SESSION_CODE_SECRET:-generate_with_scripts_generate_secrets_py}
+      - ATTENDANCE_TICKET_SECRET=${ATTENDANCE_TICKET_SECRET:-generate_with_scripts_generate_secrets_py}
+      - FACE_ENCRYPTION_KEY=${FACE_ENCRYPTION_KEY:-E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=}
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,https://yourdomain.com
+    volumes:
+      - classvision_data:/app/data
+
+volumes:
+  classvision_data:
+    driver: local
