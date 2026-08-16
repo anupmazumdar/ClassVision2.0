@@ -40,6 +40,75 @@ ClassVision 2.0 is a **high-security, bypass-resistant AI attendance system** en
 
 ---
 
+## 🔬 How the AI & Face Recognition Model Works
+
+ClassVision 2.0 utilizes a **Zero-Retraining Metric Learning Pipeline**. Unlike legacy machine learning classifiers (such as LBPH or traditional CNNs) that require retraining the entire model on the entire class roster whenever a single new student is added, ClassVision uses **instant feature vector embedding extraction and cosine similarity matching**.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. ENROLLMENT / REGISTRATION PHASE                                          │
+│    Webcam Photo ──► Haar Cascade ──► 64x64 Patch ──► HOG Vector (L2 Norm)   │
+│                     (Face Detect)    (Preprocess)     (AES-128 DB Storage)  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 2. LIVE INFERENCE / ATTENDANCE CHECK-IN PHASE                               │
+│    Camera Stream ──► Burst Liveness ──► Query Vector Q                      │
+│                      (Δ Motion Check)        │                              │
+│                                              ▼                              │
+│    Encrypted DB Vectors K ──► Decrypt ──► Cosine Similarity (Q · K)         │
+│                                              │                              │
+│                                              ▼                              │
+│    Best Score ≥ 0.78 ───────────────► VERIFIED & MARKED PRESENT!            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Enrollment Phase (Biometric Vector Generation)
+
+When a student registers their face through the 5-angle guided UI ([`RegisterStudent.jsx`](file:///c:/Users/anupm/Desktop/UEMHackathon/ClassVision/ClassVision1/frontend/src/pages/RegisterStudent.jsx)):
+
+1. **Facial Detection**: OpenCV Haar Cascade (`haarcascade_frontalface_default.xml`) locates face coordinates $(x, y, w, h)$ in the raw frame.
+2. **Preprocessing**: The detected region is converted to grayscale and normalized to a fixed $64 \times 64$ pixel patch.
+3. **Feature Extraction (HOG Descriptor)**:
+   - `cv2.HOGDescriptor(winSize=(64,64), blockSize=(16,16), blockStride=(8,8), cellSize=(8,8), nbins=9)` computes gradient orientation histograms across facial contours (eyes, nose, jawline).
+   - This generates a mathematical 1D feature vector describing the unique structural geometry of the face.
+4. **L2 Unit Normalization**:
+   The feature vector $v$ is normalized by its Euclidean norm:
+   $$\hat{v} = \frac{v}{\|v\|_2} = \frac{v}{\sqrt{\sum v_i^2}}$$
+   This ensures illumination and lighting variations across classrooms do not distort mathematical distances.
+5. **Fernet AES-128 Encryption**:
+   The normalized float vectors are encrypted into ciphertext (`gAAAAA...`) and saved in the SQLite `students.face_encodings` column.
+
+---
+
+### 2. Inference & Attendance Phase (Cosine Metric Learning)
+
+During live classroom scanning or 1-by-1 kiosk check-in ([`Session.jsx`](file:///c:/Users/anupm/Desktop/UEMHackathon/ClassVision/ClassVision1/frontend/src/pages/Session.jsx)):
+
+1. **Anti-Spoofing Liveness Gate**: A 2-frame burst analysis verifies micro-motion ($\Delta \ge 0.6$) and texture sharpness before recognition executes.
+2. **Query Vector Generation**: A normalized query vector $Q$ is extracted from the live camera frame.
+3. **Cosine Similarity Computation**:
+   Since all stored vectors $K$ and query vectors $Q$ are unit-normalized ($\|Q\| = \|K\| = 1$), the **Cosine Similarity** is equal to the simple dot product:
+   $$\text{Similarity}(Q, K) = \cos(\theta) = \frac{Q \cdot K}{\|Q\| \|K\|} = \sum_{i=1}^{n} q_i \cdot k_i$$
+4. **Multi-Angle Best-Match Evaluation**:
+   For each student, the query is compared against all 5 registered pose vectors (Center, Left $20^\circ$, Right $20^\circ$, Smile, Tilt), and the maximum similarity is chosen:
+   $$\text{Score}_{\text{student}} = \max \left( \text{Similarity}(Q, K_1), \dots, \text{Similarity}(Q, K_5) \right)$$
+5. **Threshold Verification & Confidence Scaling**:
+   If $\text{Score}_{\text{student}} \ge 0.78$ (`FACE_SIMILARITY_THRESHOLD`), the student is confirmed and mapped to an intuitive confidence percentage:
+   $$\text{Confidence (\%)} = \min\left(99.9, \max\left(60.0, \frac{\text{Score} - 0.5}{0.5} \times 100\right)\right)$$
+
+---
+
+### 🆚 Architectural Comparison: Legacy Retraining vs ClassVision 2.0
+
+| Metric / Property | Legacy Retraining Model (LBPH / Custom CNN) | ClassVision 2.0 (HOG Vector Metric Learning) |
+| :--- | :--- | :--- |
+| **New Student Enrollment** | Requires full model retraining ($30\text{s} - 2\text{ mins}$) | **Instant (< 100ms)** — Direct encrypted DB insert |
+| **Disk Footprint** | Heavy binary weight files (`.yml` / `.h5` / `.onnx`) | Lightweight AES-128 encrypted JSON vectors in SQLite |
+| **Multi-Pose Robustness** | Fails on slight head turn or angle variation | **5-Angle Guided Encodings** (Front, Left, Right, Smile, Tilt) |
+| **Zero Retraining Required** | No — Retrain on every student add/delete | **Yes — Completely Zero Retraining** |
+| **Cryptographic Linkage** | Client supplies vulnerable `student_id` | **HMAC-SHA256 15s tickets** issued only upon valid vector match |
+
+---
+
 ## 🏗️ 5-Layer System Architecture
 
 ClassVision strictly enforces unidirectional data flow: **View (UI) → Router (API) → Service (Business/AI) → Repository (SQL Queries) → Database**.
@@ -48,7 +117,7 @@ ClassVision strictly enforces unidirectional data flow: **View (UI) → Router (
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. VIEW LAYER (frontend/src/)                               │
 │    • Pages: Dashboard, Session, Students, Reports, Login     │
-│    • Custom Hooks: useAuth, useStudents                     │
+│    • Custom Hooks: useAuth, useStudents, usePWAInstall      │
 │    • Unified API Client: api/client.js (device + consent)   │
 │    • Deterministic Hardware Fingerprinting: utils/device.js │
 ├─────────────────────────────────────────────────────────────┤
@@ -59,7 +128,7 @@ ClassVision strictly enforces unidirectional data flow: **View (UI) → Router (
 ├─────────────────────────────────────────────────────────────┤
 │ 3. SERVICE LAYER (backend/services/)                        │
 │    • attendance_service (atomic scan-and-mark, HMAC tickets)│
-│    • face_service (OpenCV Haar/HOG recognition + liveness)  │
+│    • face_service (HOG descriptor matching + burst liveness)│
 │    • session_service (TOTP rolling codes + Haversine GPS)   │
 │    • report_service (PDF & Excel generation)                │
 │    • auth_service & student_service (consent enforcement)   │
@@ -87,61 +156,51 @@ ClassVision/
 │   ├── main.py                        # FastAPI entry point & router registration
 │   ├── test_priority1.py              # Security, anti-spoof & rate-limiting test suite
 │   ├── test_priority2.py              # Biometric encryption at rest & consent test suite
+│   ├── tests/                         # Pytest automated test suite
+│   │   ├── conftest.py                # Isolated test DB fixtures & auth headers
+│   │   ├── test_auth_flow.py          # Auth & bcrypt verification
+│   │   ├── test_students_flow.py      # Student & biometric consent tests
+│   │   ├── test_sessions_flow.py      # TOTP rolling code & geofence tests
+│   │   ├── test_attendance_flow.py    # HMAC ticket & atomic attendance tests
+│   │   └── test_reports_flow.py       # RBAC privacy & export tests
 │   ├── utils/
 │   │   └── crypto.py                  # Fernet AES-128 SQLAlchemy EncryptedText
+│   ├── scripts/
+│   │   └── generate_secrets.py        # Production secret generator CLI
 │   ├── models/                        # DB Table Schemas
 │   │   ├── student.py                 # Student model (EncryptedText, consent fields)
 │   │   ├── session.py                 # ClassSession model (with GPS & TOTP flags)
 │   │   ├── attendance.py              # AttendanceRecord model
 │   │   └── user.py                    # User model (roles: superadmin/admin/teacher)
 │   ├── repositories/                  # Raw SQL operations
-│   │   ├── student_repo.py
-│   │   ├── session_repo.py
-│   │   ├── attendance_repo.py
-│   │   └── user_repo.py
 │   ├── services/                      # Business rules & AI logic
-│   │   ├── attendance_service.py      # Atomic scan-and-mark & HMAC ticket verification
-│   │   ├── face_service.py            # Face recognition & burst liveness analysis
-│   │   ├── session_service.py         # 30s rolling code generation & validation
-│   │   ├── student_service.py         # Consent validation & student management
-│   │   ├── auth_service.py
-│   │   └── report_service.py
 │   ├── routers/                       # HTTP API routes
-│   │   ├── attendance_router.py
-│   │   ├── session_router.py
-│   │   ├── student_router.py
-│   │   ├── auth_router.py
-│   │   ├── report_router.py
-│   │   └── user_router.py
-│   ├── schemas/                       # Pydantic validation schemas
 │   └── middleware/
 │       └── jwt_middleware.py          # JWT, RBAC guards & brute-force rate limiters
 │
-├── frontend/                          # React + Vite + TailwindCSS
+├── frontend/                          # React + Vite + TailwindCSS + PWA
+│   ├── public/
+│   │   ├── manifest.json              # Web App Manifest
+│   │   ├── sw.js                      # Offline App Shell Service Worker
+│   │   └── icon-192.png / icon-512.png# PWA App Icons
 │   ├── src/
-│   │   ├── api/
-│   │   │   └── client.js              # Unified API client with device binding & consent
-│   │   ├── hooks/
-│   │   │   ├── useAuth.js             # Authentication hook
-│   │   │   └── useStudents.js         # Student management hook
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx          # Live teacher dashboard & session creator
-│   │   │   ├── Session.jsx            # Live camera scan, rolling code & present list
-│   │   │   ├── Students.jsx           # Student directory, encrypted face & consent badges
-│   │   │   ├── RegisterStudent.jsx    # Webcam enrollment with biometric consent checkbox
-│   │   │   ├── Reports.jsx            # PDF / Excel exports & email reports
-│   │   │   ├── Users.jsx              # Admin user management
-│   │   │   └── Login.jsx              # Secured JWT authentication
-│   │   ├── components/
-│   │   │   ├── Camera.jsx             # Video stream & burst capture
-│   │   │   └── Navbar.jsx
-│   │   └── utils/
-│   │       └── device.js              # Deterministic hardware + canvas fingerprinting
+│   │   ├── api/client.js              # Unified API client with device binding & consent
+│   │   ├── hooks/                     # useAuth, useStudents, usePWAInstall
+│   │   ├── pages/                     # Dashboard, Session, Students, RegisterStudent, Reports, Users, Login
+│   │   ├── components/                # Camera, NavBar, InstallPrompt
+│   │   └── utils/device.js            # Deterministic hardware + canvas fingerprinting
 │   ├── package.json
 │   └── vite.config.js
 │
-├── legacy/                            # Archived v1 Tkinter desktop client
-│   └── client/
+├── mobile/                            # Native React Native / Expo Mobile App
+│   ├── src/App.tsx                    # Front-camera burst scan, GPS, TOTP code & device ID
+│   ├── src/api.ts                     # Mobile API client
+│   ├── package.json
+│   └── README.md                      # Expo & Google Play Store release guide
+│
+├── Dockerfile                         # Production Multi-stage Docker build
+├── docker-compose.yml                 # Container orchestration
+├── DEPLOYMENT.md                      # Complete cloud deployment guide (Render/Vercel/Docker)
 └── README.md
 ```
 
@@ -167,10 +226,13 @@ ClassVision/
    ```
 3. Run the automated test suites:
    ```bash
-   # Priority 1: Security, Anti-Spoof, Rate Limiting & RBAC
+   # Run full Pytest suite (8 critical flows)
+   python -m pytest tests -v
+
+   # Run Priority 1 security verification suite
    python test_priority1.py
 
-   # Priority 2: Biometric Encryption at Rest & Consent
+   # Run Priority 2 biometric encryption & consent suite
    python test_priority2.py
    ```
 4. Start the FastAPI server:
@@ -218,35 +280,7 @@ ClassVision/
 - **Password:** `admin123`
 - **Role:** `admin`
 
-*(In production environments, set `JWT_SECRET`, `SESSION_CODE_SECRET`, `ATTENDANCE_TICKET_SECRET`, and `FACE_ENCRYPTION_KEY` in your `.env` file.)*
-
----
-
-## 🧪 Comprehensive Automated Test Suites
-
-Run both test suites to verify system integrity:
-
-```bash
-cd backend
-python test_priority1.py
-python test_priority2.py
-```
-
-### Verified Priority 1 Capabilities:
-- ✅ **Secret Decoupling**: Independent cryptographic keys for JWT, session code, and attendance tickets.
-- ✅ **Liveness Detection**: Multi-frame micro-movement analysis rejecting static photos ($\Delta = 0.0$).
-- ✅ **Atomic Server Verification**: Single-request liveness + face recognition + geofence + rolling code + device check.
-- ✅ **Cryptographic Tickets**: 15s HMAC-SHA256 tokens preventing client-spoofed `student_id` marking.
-- ✅ **Classroom Geofencing**: Haversine formula rejecting out-of-bounds check-ins (1.4km away).
-- ✅ **30s Rolling Code Rate Limiting**: 5-attempt lockout preventing brute-force code guessing (`HTTP 429`).
-- ✅ **Deterministic Device Binding**: Prevents proxy check-in across browser sessions / clear storage.
-- ✅ **Report Access Control**: Student accounts blocked from full-class reports and SMTP relaying (`HTTP 403`).
-
-### Verified Priority 2 Capabilities:
-- ✅ **Encryption at Rest**: Raw SQLite database inspection verifies `face_encodings` stored as AES-128 Fernet ciphertext (`gAAAAA...`).
-- ✅ **Transparent Decryption**: SQLAlchemy ORM transparently yields original float embedding arrays on read.
-- ✅ **Consent Enforcement**: Face registration rejected with `HTTP 400` without explicit consent flag.
-- ✅ **Audit Trail**: Exact UTC consent timestamp recorded in database and exposed in student listings.
+*(In production environments, generate decoupled keys using `python backend/scripts/generate_secrets.py`.)*
 
 ---
 
