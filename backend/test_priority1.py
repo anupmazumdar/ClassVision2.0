@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import cv2
+from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from database import SessionLocal, init_db
@@ -25,29 +26,59 @@ def test_priority1_security():
                 role="teacher",
             )
 
-        # 1. TEST LIVENESS DETECTION
+        # -------------------------------------------------------------
+        # 1. TEST LIVENESS / ANTI-SPOOFING (MOTION DELTA & TEXTURE)
+        # -------------------------------------------------------------
         print("\n1. Testing Liveness / Anti-Spoofing Algorithm...")
-        # Create a synthetic face frame
-        frame1 = np.ones((240, 320, 3), dtype=np.uint8) * 128
-        # Draw face circle
-        cv2.circle(frame1, (160, 120), 50, (200, 200, 200), -1)
         
-        # Test A: Static photo (identical frames)
-        static_frames = [frame1, frame1.copy()]
-        # Verify liveness rejects duplicate/static frames
-        res_static = face_service.verify_liveness(static_frames)
-        # Note: if face cascade detects nothing on flat synthetic circle it flags detection or static
-        print("   Static image check result:", res_static)
-        assert res_static["is_live"] is False, "Static frames should be rejected"
-        print("   -> Static photo spoofing correctly rejected.")
+        # Test 1A: Non-face / Empty frame rejection (with real un-mocked Cascade)
+        empty_frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        res_noface = face_service.verify_liveness([empty_frame, empty_frame])
+        assert res_noface["is_live"] is False
+        assert "Face not continuously detected" in res_noface["reason"]
+        print("   1A. No-face frame -> correctly rejected ('Face not continuously detected').")
 
+        # Create realistic texture frame for face region testing
+        np.random.seed(42)
+        textured_frame = np.random.randint(50, 200, (240, 320, 3), dtype=np.uint8)
+        
+        mock_cascade = MagicMock()
+        mock_cascade.detectMultiScale.return_value = [(50, 50, 100, 100)]
+
+        with patch.object(face_service, '_CASCADE', mock_cascade):
+            # Test 1B: Exact Duplicate Static Photo (avg_diff == 0.0 < 0.6)
+            static_frames = [textured_frame.copy(), textured_frame.copy()]
+            res_static = face_service.verify_liveness(static_frames)
+            assert res_static["is_live"] is False, "Duplicate frame should be rejected by motion check"
+            assert "Static photo detected" in res_static["reason"], f"Unexpected reason: {res_static}"
+            assert res_static["score"] == 0.0
+            print(f"   1B. Static duplicate photo (delta={res_static['score']}) -> correctly rejected ('Static photo detected').")
+
+            # Test 1C: Genuine Live Motion (subtle micro-movement, delta around 3.0-10.0)
+            live_frame_2 = textured_frame.copy()
+            # Add slight realistic micro-movement delta in sub-region
+            live_frame_2[60:150, 60:150] = (live_frame_2[60:150, 60:150].astype(int) + 12).clip(0, 255).astype(np.uint8)
+            res_live = face_service.verify_liveness([textured_frame, live_frame_2])
+            assert res_live["is_live"] is True, f"Live frames failed: {res_live}"
+            assert res_live["motion_score"] > 0.6 and res_live["motion_score"] < 120.0
+            print(f"   1C. Genuine live micro-movement (motion_score={res_live['motion_score']}, texture_score={res_live['texture_score']}) -> PASSED ('Liveness check passed').")
+
+            # Test 1D: Extreme Camera Shake / Scene Swapping (avg_diff > 120.0)
+            shake_frame = np.full((240, 320, 3), 255, dtype=np.uint8)
+            res_shake = face_service.verify_liveness([np.zeros((240, 320, 3), dtype=np.uint8), shake_frame])
+            assert res_shake["is_live"] is False
+            assert "Excessive camera shake" in res_shake["reason"]
+            print(f"   1D. Sudden scene swap (delta={res_shake['score']}) -> correctly rejected ('Excessive camera shake').")
+
+        # -------------------------------------------------------------
         # 2. TEST GEOFENCING
+        # -------------------------------------------------------------
         print("\n2. Testing Geofencing Logic (Haversine Distance)...")
         # Classroom located at Lat 26.850000, Lng 75.800000 (Jaipur)
         classroom_lat = 26.850000
         classroom_lng = 75.800000
         
-        # Close by (~20m away)
+        # Close by (~19m away)
         student_near_lat = 26.850150
         student_near_lng = 75.800100
         dist_near = attendance_service.calculate_haversine_distance(
@@ -56,7 +87,7 @@ def test_priority1_security():
         assert dist_near < 50.0, f"Distance {dist_near} should be within 50m"
         print(f"   Nearby distance: {dist_near:.1f}m -> OK")
 
-        # Far away (~800m away)
+        # Far away (~923m away)
         student_far_lat = 26.857000
         student_far_lng = 75.805000
         dist_far = attendance_service.calculate_haversine_distance(
@@ -110,7 +141,9 @@ def test_priority1_security():
         assert mark_near["already_present"] is False
         print("   -> Geofence in-bounds accepted successfully.")
 
+        # -------------------------------------------------------------
         # 3. TEST ROTATING SESSION CODE
+        # -------------------------------------------------------------
         print("\n3. Testing 30s Rotating Session Code...")
         session_code_test = session_repo.create_session(
             db,
@@ -154,7 +187,9 @@ def test_priority1_security():
         assert mark_code["already_present"] is False
         print("   -> Valid rotating code accepted successfully.")
 
+        # -------------------------------------------------------------
         # 4. TEST DEVICE BINDING
+        # -------------------------------------------------------------
         print("\n4. Testing Device Binding...")
         st3 = student_repo.get_student_by_enrollment(db, "DEV003")
         if st3:
@@ -208,7 +243,7 @@ def test_priority1_security():
         session_service.delete_session(db, session_code_test.id)
         session_service.delete_session(db, session_plain.id)
         session_service.delete_session(db, session_plain2.id)
-        print("\nALL PRIORITY 1 SECURITY & ANTI-SPOOFING TESTS PASSED!")
+        print("\nALL PRIORITY 1 SECURITY & ANTI-SPOOFING TESTS PASSED PERFECTLY!")
 
     finally:
         db.close()

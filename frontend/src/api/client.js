@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getDeviceId } from "../utils/device";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -65,18 +66,21 @@ export const deleteSession = (sessionId) => client.delete(`/sessions/${sessionId
 export const recognizeFaces = (image, frames = null) =>
   client.post("/attendance/recognize", { image, frames }).then((r) => r.data);
 
-export const markAttendance = (sessionId, studentId, confidence, extra = {}) =>
-  client
+export const markAttendance = (sessionId, studentId, confidence, extra = {}) => {
+  const resolvedDeviceId =
+    extra.device_id !== undefined ? extra.device_id : getDeviceId();
+  return client
     .post(`/attendance/${sessionId}/mark`, {
       student_id: studentId,
       confidence,
       lat: extra.lat ?? null,
       lng: extra.lng ?? null,
       code: extra.code ?? null,
-      device_id: extra.device_id ?? null,
+      device_id: resolvedDeviceId,
       frames: extra.frames ?? null,
     })
     .then((r) => r.data);
+};
 
 export const unmarkAttendance = (sessionId, studentId) =>
   client.delete(`/attendance/${sessionId}/unmark/${studentId}`);

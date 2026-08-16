@@ -14,6 +14,7 @@ import {
   MapPin,
   ShieldCheck,
   AlertTriangle,
+  Smartphone,
 } from "lucide-react";
 import Camera from "../components/Camera";
 import {
@@ -26,6 +27,7 @@ import {
   getStudents,
   getSessionCode,
 } from "../api/client";
+import { getDeviceId } from "../utils/device";
 
 export default function Session() {
   const { id } = useParams();
@@ -47,6 +49,7 @@ export default function Session() {
   const [antiSpoofAlert, setAntiSpoofAlert] = useState("");
   const [livenessEnabled, setLivenessEnabled] = useState(true);
 
+  const deviceId = getDeviceId();
   const autoRef = useRef(null);
   const codeTimerRef = useRef(null);
 
@@ -147,6 +150,7 @@ export default function Session() {
               lat: userLocation?.lat,
               lng: userLocation?.lng,
               code: liveCodeInfo.code,
+              device_id: deviceId,
               frames: burstFrames,
             }
           );
@@ -166,13 +170,18 @@ export default function Session() {
       }
     } catch (err) {
       const errorMsg = err.response?.data?.detail || "Recognition scan failed.";
-      if (errorMsg.includes("Anti-Spoofing") || errorMsg.includes("Geofence") || errorMsg.includes("code")) {
+      if (
+        errorMsg.includes("Anti-Spoofing") ||
+        errorMsg.includes("Geofence") ||
+        errorMsg.includes("code") ||
+        errorMsg.includes("Device")
+      ) {
         setAntiSpoofAlert(errorMsg);
       }
     } finally {
       setScanning(false);
     }
-  }, [scanning, livenessEnabled, id, presentMap, userLocation, liveCodeInfo]);
+  }, [scanning, livenessEnabled, id, presentMap, userLocation, liveCodeInfo, deviceId]);
 
   const handleManualMark = async (student) => {
     setMarking(student.id);
@@ -181,6 +190,7 @@ export default function Session() {
         lat: userLocation?.lat,
         lng: userLocation?.lng,
         code: liveCodeInfo.code,
+        device_id: deviceId,
       });
       if (!res.already_present) {
         setPresentMap((m) => ({
@@ -298,7 +308,7 @@ export default function Session() {
         </div>
       </div>
 
-      {/* Security alert banner if spoofing or geofence violation detected */}
+      {/* Security alert banner if spoofing, geofence, or device mismatch detected */}
       {antiSpoofAlert && (
         <div className="flex items-center gap-3 bg-red-950/70 border border-red-700 text-red-200 px-4 py-3 rounded-xl text-sm animate-shake">
           <AlertTriangle size={20} className="text-red-400 shrink-0" />
@@ -312,8 +322,8 @@ export default function Session() {
           <div className="space-y-3">
             <Camera ref={camRef} className="aspect-video w-full" />
 
-            {/* Anti-spoofing and Liveness badge */}
-            <div className="flex items-center justify-between px-1 text-xs text-gray-400">
+            {/* Security & Device Binding info row */}
+            <div className="flex items-center justify-between px-1 text-xs text-gray-400 flex-wrap gap-2">
               <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-200 transition-colors">
                 <input
                   type="checkbox"
@@ -322,13 +332,19 @@ export default function Session() {
                   className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
                 />
                 <ShieldCheck size={14} className="text-green-400" />
-                Anti-Spoofing Liveness Check (Burst Capture)
+                Anti-Spoofing Liveness (Burst)
               </label>
-              {userLocation && (
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <MapPin size={12} /> GPS Active
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-gray-400" title={`Bound Device ID: ${deviceId}`}>
+                  <Smartphone size={12} className="text-indigo-400" />
+                  Dev: {deviceId.substring(0, 8)}…
                 </span>
-              )}
+                {userLocation && (
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <MapPin size={12} /> GPS Active
+                  </span>
+                )}
+              </div>
             </div>
 
             {lastResult !== null && (
