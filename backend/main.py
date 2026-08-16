@@ -8,6 +8,7 @@ from config import (
     DEFAULT_ADMIN_PASSWORD,
     SERVER_HOST,
     SERVER_PORT,
+    check_security_config,
 )
 from database import SessionLocal, init_db
 from routers import (
@@ -32,6 +33,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup() -> None:
+    check_security_config()
     init_db()
     db = SessionLocal()
     try:

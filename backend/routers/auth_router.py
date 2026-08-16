@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.jwt_middleware import get_current_user, require_admin
+from middleware.jwt_middleware import (
+    check_login_rate_limit,
+    get_current_user,
+    record_failed_login,
+    require_admin,
+)
 from schemas.auth_schema import LoginRequest, RegisterRequest
 from services import auth_service
 
@@ -10,8 +15,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    return auth_service.login(db, body.email, body.password)
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "unknown"
+    check_login_rate_limit(client_ip)
+
+    try:
+        result = auth_service.login(db, body.email, body.password)
+        return result
+    except HTTPException:
+        record_failed_login(client_ip)
+        raise
 
 
 @router.post("/register", status_code=201)

@@ -5,14 +5,14 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from config import JWT_SECRET
+from config import SESSION_CODE_SECRET
 from repositories import attendance_repo, session_repo
 
 CODE_ROTATION_WINDOW = 30  # seconds
 
 
 def _generate_code(session_id: int, time_step: int) -> str:
-    seed = f"{session_id}:{JWT_SECRET}:{time_step}".encode()
+    seed = f"{session_id}:{SESSION_CODE_SECRET}:{time_step}".encode()
     digest = hashlib.sha256(seed).hexdigest()
     # Pick a 6-digit integer from the hash
     num = int(digest[:8], 16) % 1000000

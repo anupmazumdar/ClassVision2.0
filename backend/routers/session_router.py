@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from middleware.jwt_middleware import get_current_user, require_admin
+from middleware.jwt_middleware import get_current_user, require_admin, require_teacher_or_admin
 from schemas.session_schema import SessionCreate
 from services import session_service
 
@@ -18,7 +18,7 @@ def list_sessions(db: Session = Depends(get_db), _: dict = Depends(get_current_u
 def start_session(
     body: SessionCreate,
     db: Session = Depends(get_db),
-    current: dict = Depends(get_current_user),
+    current: dict = Depends(require_teacher_or_admin),
 ):
     return session_service.start_session(
         db,
@@ -35,8 +35,9 @@ def start_session(
 @router.get("/{session_id}/code")
 def get_session_code(
     session_id: int,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(require_teacher_or_admin),
 ):
+    """Only teachers and admins can query the rolling code API to display on screen."""
     return session_service.get_current_session_code(session_id)
 
 
@@ -44,7 +45,7 @@ def get_session_code(
 def stop_session(
     session_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(require_teacher_or_admin),
 ):
     return session_service.stop_session(db, session_id)
 

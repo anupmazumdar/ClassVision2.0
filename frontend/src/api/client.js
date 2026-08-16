@@ -63,8 +63,30 @@ export const getSession = (sessionId) =>
 
 export const deleteSession = (sessionId) => client.delete(`/sessions/${sessionId}`);
 
-export const recognizeFaces = (image, frames = null) =>
-  client.post("/attendance/recognize", { image, frames }).then((r) => r.data);
+export const recognizeFaces = (image, frames = null, sessionId = null) =>
+  client
+    .post("/attendance/recognize", {
+      image,
+      frames,
+      session_id: sessionId,
+      device_id: getDeviceId(),
+    })
+    .then((r) => r.data);
+
+export const scanAndMark = (sessionId, image, frames = null, extra = {}) => {
+  const resolvedDeviceId =
+    extra.device_id !== undefined ? extra.device_id : getDeviceId();
+  return client
+    .post(`/attendance/${sessionId}/scan-and-mark`, {
+      image,
+      frames,
+      lat: extra.lat ?? null,
+      lng: extra.lng ?? null,
+      code: extra.code ?? null,
+      device_id: resolvedDeviceId,
+    })
+    .then((r) => r.data);
+};
 
 export const markAttendance = (sessionId, studentId, confidence, extra = {}) => {
   const resolvedDeviceId =
@@ -72,15 +94,20 @@ export const markAttendance = (sessionId, studentId, confidence, extra = {}) => 
   return client
     .post(`/attendance/${sessionId}/mark`, {
       student_id: studentId,
+      attendance_ticket: extra.attendance_ticket ?? null,
       confidence,
       lat: extra.lat ?? null,
       lng: extra.lng ?? null,
       code: extra.code ?? null,
       device_id: resolvedDeviceId,
-      frames: extra.frames ?? null,
     })
     .then((r) => r.data);
 };
+
+export const manualMarkAttendance = (sessionId, studentId) =>
+  client
+    .post(`/attendance/${sessionId}/manual-mark`, { student_id: studentId })
+    .then((r) => r.data);
 
 export const unmarkAttendance = (sessionId, studentId) =>
   client.delete(`/attendance/${sessionId}/unmark/${studentId}`);

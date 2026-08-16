@@ -20,8 +20,8 @@ import Camera from "../components/Camera";
 import {
   getSession,
   stopSession,
-  recognizeFaces,
-  markAttendance,
+  scanAndMark,
+  manualMarkAttendance,
   unmarkAttendance,
   downloadExcel,
   getStudents,
@@ -131,42 +131,37 @@ export default function Session() {
       frame = burstFrames?.[0];
     } else {
       frame = camRef.current?.capture();
+      burstFrames = [frame, frame];
     }
 
     if (!frame) return;
     setScanning(true);
 
     try {
-      const result = await recognizeFaces(frame, burstFrames);
+      // Atomic Server-Side Recognition + Liveness + Mark Check
+      const result = await scanAndMark(parseInt(id), frame, burstFrames, {
+        lat: userLocation?.lat,
+        lng: userLocation?.lng,
+        code: liveCodeInfo.code,
+        device_id: deviceId,
+      });
+
       setLastResult(result.recognized);
 
-      for (const face of result.recognized) {
-        if (!presentMap[face.student_id]) {
-          const res = await markAttendance(
-            parseInt(id),
-            face.student_id,
-            face.confidence,
-            {
-              lat: userLocation?.lat,
-              lng: userLocation?.lng,
-              code: liveCodeInfo.code,
-              device_id: deviceId,
-              frames: burstFrames,
-            }
-          );
-          if (!res.already_present) {
-            setPresentMap((m) => ({
-              ...m,
-              [face.student_id]: {
-                student_id: face.student_id,
-                name: face.name,
-                enrollment: face.enrollment,
-                confidence: face.confidence,
-                marked_at: new Date().toISOString(),
-              },
-            }));
+      if (result.marked && result.marked.length > 0) {
+        setPresentMap((prev) => {
+          const next = { ...prev };
+          for (const m of result.marked) {
+            next[m.student_id] = {
+              student_id: m.student_id,
+              name: m.name,
+              enrollment: m.enrollment,
+              confidence: m.confidence,
+              marked_at: new Date().toISOString(),
+            };
           }
-        }
+          return next;
+        });
       }
     } catch (err) {
       const errorMsg = err.response?.data?.detail || "Recognition scan failed.";
@@ -174,24 +169,20 @@ export default function Session() {
         errorMsg.includes("Anti-Spoofing") ||
         errorMsg.includes("Geofence") ||
         errorMsg.includes("code") ||
-        errorMsg.includes("Device")
+        errorMsg.includes("Device") ||
+        errorMsg.includes("Security")
       ) {
         setAntiSpoofAlert(errorMsg);
       }
     } finally {
       setScanning(false);
     }
-  }, [scanning, livenessEnabled, id, presentMap, userLocation, liveCodeInfo, deviceId]);
+  }, [scanning, livenessEnabled, id, userLocation, liveCodeInfo, deviceId]);
 
   const handleManualMark = async (student) => {
     setMarking(student.id);
     try {
-      const res = await markAttendance(parseInt(id), student.id, 0, {
-        lat: userLocation?.lat,
-        lng: userLocation?.lng,
-        code: liveCodeInfo.code,
-        device_id: deviceId,
-      });
+      const res = await manualMarkAttendance(parseInt(id), student.id);
       if (!res.already_present) {
         setPresentMap((m) => ({
           ...m,
@@ -205,7 +196,7 @@ export default function Session() {
         }));
       }
     } catch (err) {
-      alert(err.response?.data?.detail || "Failed to mark attendance.");
+      alert(err.response?.data?.detail || "Failed to mark attendance manually.");
     } finally {
       setMarking(null);
     }
@@ -337,7 +328,7 @@ export default function Session() {
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 text-gray-400" title={`Bound Device ID: ${deviceId}`}>
                   <Smartphone size={12} className="text-indigo-400" />
-                  Dev: {deviceId.substring(0, 8)}…
+                  Dev: {deviceId.substring(0, 12)}…
                 </span>
                 {userLocation && (
                   <span className="flex items-center gap-1 text-emerald-400">
@@ -356,8 +347,8 @@ export default function Session() {
                 }`}
               >
                 {lastResult.length > 0
-                  ? `✓ Detected: ${lastResult.map((f) => f.name).join(", ")}`
-                  : "No faces recognized in last scan"}
+                  ? `✓ Recognized & Verified: ${lastResult.map((f) => f.name).join(", ")}`
+                  : "No registered faces recognized in last scan"}
               </div>
             )}
 
@@ -373,7 +364,7 @@ export default function Session() {
                   </>
                 ) : (
                   <>
-                    <CameraIcon size={15} /> Scan Once
+                    <CameraIcon size={15} /> Scan & Mark
                   </>
                 )}
               </button>
@@ -390,7 +381,7 @@ export default function Session() {
               </button>
             </div>
             <p className="text-xs text-gray-600 text-center">
-              Auto-scan runs every 4s with rolling security validation
+              Atomic server validation: Anti-spoofing + Face Match + GPS + Rolling Code + Device Binding
             </p>
           </div>
         )}
@@ -438,7 +429,7 @@ export default function Session() {
                         <p className="text-xs text-gray-600">{r.enrollment}</p>
                       </div>
                       <span className="text-xs text-gray-500 shrink-0">
-                        {r.confidence > 0 ? `${r.confidence?.toFixed(1)}%` : "Manual"}
+                        {r.confidence > 0 ? `${r.confidence?.toFixed(1)}%` : "Teacher Manual"}
                       </span>
                       {session.is_active && (
                         <button
