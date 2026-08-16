@@ -15,6 +15,11 @@ import {
   ShieldCheck,
   AlertTriangle,
   Smartphone,
+  Maximize2,
+  Sparkles,
+  Zap,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import Camera from "../components/Camera";
 import {
@@ -29,17 +34,41 @@ import {
 } from "../api/client";
 import { getDeviceId } from "../utils/device";
 
+function playSuccessChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880.0, ctx.currentTime + 0.08); // A5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch {
+    // Ignored if audio not allowed by browser autoplay
+  }
+}
+
 export default function Session() {
   const { id } = useParams();
   const navigate = useNavigate();
   const camRef = useRef(null);
+  const containerRef = useRef(null);
 
   const [session, setSession] = useState(null);
   const [allStudents, setAllStudents] = useState([]);
   const [presentMap, setPresentMap] = useState({});
   const [scanning, setScanning] = useState(false);
   const [autoScan, setAutoScan] = useState(false);
+  const [scanMode, setScanMode] = useState("group"); // "group" | "kiosk"
   const [lastResult, setLastResult] = useState(null);
+  const [kioskSuccess, setKioskSuccess] = useState(null); // { name, enrollment, confidence }
   const [stopping, setStopping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [rightTab, setRightTab] = useState("present"); // present | all
@@ -48,10 +77,13 @@ export default function Session() {
   const [userLocation, setUserLocation] = useState(null);
   const [antiSpoofAlert, setAntiSpoofAlert] = useState("");
   const [livenessEnabled, setLivenessEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const deviceId = getDeviceId();
   const autoRef = useRef(null);
   const codeTimerRef = useRef(null);
+  const kioskResetTimerRef = useRef(null);
 
   const loadSession = useCallback(async () => {
     try {
@@ -67,7 +99,7 @@ export default function Session() {
     }
   }, [id]);
 
-  // Fetch current GPS coords
+  // GPS coords
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -77,21 +109,19 @@ export default function Session() {
             lng: pos.coords.longitude,
           });
         },
-        () => {
-          // Geolocation permission not granted or unavailable
-        },
+        () => {},
         { enableHighAccuracy: true, timeout: 5000 }
       );
     }
   }, []);
 
-  // Poll for live rotating code if active
+  // Poll for live rotating code
   const fetchLiveCode = useCallback(async () => {
     try {
       const data = await getSessionCode(parseInt(id));
       setLiveCodeInfo(data);
     } catch {
-      // Ignored if not authorized or session ended
+      // Ignored if not authorized
     }
   }, [id]);
 
@@ -104,19 +134,9 @@ export default function Session() {
     return () => {
       clearInterval(autoRef.current);
       clearInterval(codeTimerRef.current);
+      clearTimeout(kioskResetTimerRef.current);
     };
   }, [id, loadSession, fetchLiveCode]);
-
-  useEffect(() => {
-    if (autoScan) {
-      autoRef.current = setInterval(() => {
-        handleScan();
-      }, 4000);
-    } else {
-      clearInterval(autoRef.current);
-    }
-    return () => clearInterval(autoRef.current);
-  }, [autoScan]);
 
   const handleScan = useCallback(async () => {
     if (scanning) return;
@@ -126,7 +146,6 @@ export default function Session() {
     let burstFrames = null;
 
     if (livenessEnabled && camRef.current?.captureSequence) {
-      // Capture 2-frame burst for anti-spoofing micro-movement validation
       burstFrames = await camRef.current.captureSequence(2, 250);
       frame = burstFrames?.[0];
     } else {
@@ -138,7 +157,6 @@ export default function Session() {
     setScanning(true);
 
     try {
-      // Atomic Server-Side Recognition + Liveness + Mark Check
       const result = await scanAndMark(parseInt(id), frame, burstFrames, {
         lat: userLocation?.lat,
         lng: userLocation?.lng,
@@ -162,6 +180,20 @@ export default function Session() {
           }
           return next;
         });
+
+        // Trigger Kiosk Celebration Modal for the single student
+        const firstMarked = result.marked[0];
+        if (soundEnabled) {
+          playSuccessChime();
+        }
+
+        if (scanMode === "kiosk") {
+          setKioskSuccess(firstMarked);
+          clearTimeout(kioskResetTimerRef.current);
+          kioskResetTimerRef.current = setTimeout(() => {
+            setKioskSuccess(null);
+          }, 2800);
+        }
       }
     } catch (err) {
       const errorMsg = err.response?.data?.detail || "Recognition scan failed.";
@@ -177,7 +209,32 @@ export default function Session() {
     } finally {
       setScanning(false);
     }
-  }, [scanning, livenessEnabled, id, userLocation, liveCodeInfo, deviceId]);
+  }, [scanning, livenessEnabled, id, userLocation, liveCodeInfo, deviceId, scanMode, soundEnabled]);
+
+  // Auto-scan cycle
+  useEffect(() => {
+    if (autoScan || scanMode === "kiosk") {
+      const interval = scanMode === "kiosk" ? 2800 : 4000;
+      autoRef.current = setInterval(() => {
+        if (!kioskSuccess) {
+          handleScan();
+        }
+      }, interval);
+    } else {
+      clearInterval(autoRef.current);
+    }
+    return () => clearInterval(autoRef.current);
+  }, [autoScan, scanMode, handleScan, kioskSuccess]);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen?.();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIsFullscreen(false);
+    }
+  };
 
   const handleManualMark = async (student) => {
     setMarking(student.id);
@@ -239,12 +296,19 @@ export default function Session() {
   const presentList = Object.values(presentMap);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
+    <div ref={containerRef} className="space-y-5 bg-gray-950 p-2 sm:p-0 rounded-2xl">
+      {/* Header Bar */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">{session.subject}</h1>
-          <div className="flex items-center gap-3 text-gray-500 text-sm mt-1 flex-wrap">
+          <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
+            {session.subject}
+            {scanMode === "kiosk" && (
+              <span className="text-xs font-semibold uppercase tracking-wider bg-amber-950/80 text-amber-300 border border-amber-700/80 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <Zap size={12} /> Kiosk Mode
+              </span>
+            )}
+          </h1>
+          <div className="flex items-center gap-3 text-gray-400 text-xs sm:text-sm mt-1 flex-wrap">
             {session.room && <span>Room {session.room}</span>}
             <span>Started {new Date(session.started_at).toLocaleTimeString()}</span>
             {session.is_active && (
@@ -262,6 +326,38 @@ export default function Session() {
         </div>
 
         <div className="flex gap-2 flex-wrap items-center">
+          {/* Mode Switcher Tabs */}
+          {session.is_active && (
+            <div className="flex rounded-xl bg-gray-900 border border-gray-800 p-1 text-xs">
+              <button
+                onClick={() => {
+                  setScanMode("group");
+                  setAutoScan(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                  scanMode === "group"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                Group Scan
+              </button>
+              <button
+                onClick={() => {
+                  setScanMode("kiosk");
+                  setAutoScan(true);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1 ${
+                  scanMode === "kiosk"
+                    ? "bg-amber-600 text-white shadow"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                <Zap size={13} /> 1-by-1 Kiosk
+              </button>
+            </div>
+          )}
+
           {/* Rotating Session Code Badge */}
           {session.is_active && (
             <div className="flex items-center gap-2 bg-indigo-950/80 border border-indigo-700/70 rounded-xl px-3 py-1.5 text-indigo-200 shadow-inner">
@@ -276,6 +372,14 @@ export default function Session() {
               </div>
             </div>
           )}
+
+          <button
+            onClick={toggleFullscreen}
+            className="btn-secondary p-2 text-gray-400 hover:text-white"
+            title="Toggle Fullscreen"
+          >
+            <Maximize2 size={16} />
+          </button>
 
           {!session.is_active && (
             <button
@@ -299,7 +403,7 @@ export default function Session() {
         </div>
       </div>
 
-      {/* Security alert banner if spoofing, geofence, or device mismatch detected */}
+      {/* Security alert banner */}
       {antiSpoofAlert && (
         <div className="flex items-center gap-3 bg-red-950/70 border border-red-700 text-red-200 px-4 py-3 rounded-xl text-sm animate-shake">
           <AlertTriangle size={20} className="text-red-400 shrink-0" />
@@ -307,28 +411,93 @@ export default function Session() {
         </div>
       )}
 
+      {/* Main Grid View */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Camera + controls */}
+        {/* Camera + Viewfinder */}
         {session.is_active && (
           <div className="space-y-3">
-            <Camera ref={camRef} className="aspect-video w-full" />
+            <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-black aspect-video flex items-center justify-center">
+              <Camera ref={camRef} className="w-full h-full object-cover" />
 
-            {/* Security & Device Binding info row */}
+              {/* Kiosk Mode Overlay: Biometric Framing Oval */}
+              {scanMode === "kiosk" && !kioskSuccess && (
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                  <div className="w-48 h-64 border-2 border-dashed border-amber-400/70 rounded-[50%] animate-pulse flex flex-col items-center justify-between py-4 backdrop-brightness-110">
+                    <span className="text-[10px] bg-black/70 text-amber-300 font-semibold px-2.5 py-0.5 rounded-full border border-amber-500/50 uppercase tracking-widest backdrop-blur-md">
+                      Align Face
+                    </span>
+                    <span className="text-[11px] bg-black/70 text-gray-300 px-2 py-0.5 rounded-full backdrop-blur-md">
+                      1-by-1 Kiosk Check-In
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Kiosk Mode Celebration Card (When Student Verified) */}
+              {kioskSuccess && (
+                <div className="absolute inset-0 bg-gray-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in z-20">
+                  <div className="w-20 h-20 bg-green-500/20 border-2 border-green-400 rounded-full flex items-center justify-center mb-3 text-green-400 shadow-xl shadow-green-500/30 animate-bounce">
+                    <CheckCircle size={44} />
+                  </div>
+                  <span className="text-xs uppercase tracking-widest font-semibold text-green-400 bg-green-950/80 px-3 py-1 rounded-full border border-green-800 mb-2">
+                    Verified Present
+                  </span>
+                  <h2 className="text-2xl font-bold text-white mb-1">{kioskSuccess.name}</h2>
+                  <p className="text-sm text-gray-400 font-mono mb-3">{kioskSuccess.enrollment}</p>
+                  <div className="flex items-center gap-2 text-xs text-indigo-300 bg-indigo-950/60 px-3 py-1.5 rounded-lg border border-indigo-800/60">
+                    <Sparkles size={13} className="text-indigo-400" />
+                    Biometric Match: {kioskSuccess.confidence}% Confidence
+                  </div>
+                  <div className="w-48 bg-gray-800 h-1.5 rounded-full mt-4 overflow-hidden">
+                    <div className="bg-green-400 h-full w-full animate-shrink-bar" />
+                  </div>
+                  <span className="text-[10px] text-gray-500 mt-2">Ready for next student…</span>
+                </div>
+              )}
+
+              {/* Scanning status pill */}
+              {scanning && (
+                <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md border border-indigo-500/50 text-indigo-300 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
+                  <Loader2 size={13} className="animate-spin text-indigo-400" /> Verifying Biometrics…
+                </div>
+              )}
+            </div>
+
+            {/* Controls & Security info row */}
             <div className="flex items-center justify-between px-1 text-xs text-gray-400 flex-wrap gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-200 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={livenessEnabled}
-                  onChange={(e) => setLivenessEnabled(e.target.checked)}
-                  className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
-                />
-                <ShieldCheck size={14} className="text-green-400" />
-                Anti-Spoofing Liveness (Burst)
-              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={livenessEnabled}
+                    onChange={(e) => setLivenessEnabled(e.target.checked)}
+                    className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
+                  />
+                  <ShieldCheck size={14} className="text-green-400" />
+                  Anti-Spoof Burst
+                </label>
+
+                <button
+                  onClick={() => setSoundEnabled((s) => !s)}
+                  className="flex items-center gap-1 hover:text-gray-200 transition-colors"
+                  title="Toggle Audio Feedback"
+                >
+                  {soundEnabled ? (
+                    <>
+                      <Volume2 size={14} className="text-indigo-400" /> Sound ON
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX size={14} className="text-gray-500" /> Sound OFF
+                    </>
+                  )}
+                </button>
+              </div>
+
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 text-gray-400" title={`Bound Device ID: ${deviceId}`}>
                   <Smartphone size={12} className="text-indigo-400" />
-                  Dev: {deviceId.substring(0, 12)}…
+                  Dev: {deviceId.substring(0, 10)}…
                 </span>
                 {userLocation && (
                   <span className="flex items-center gap-1 text-emerald-400">
@@ -338,7 +507,8 @@ export default function Session() {
               </div>
             </div>
 
-            {lastResult !== null && (
+            {/* Group Mode Result Banner */}
+            {scanMode === "group" && lastResult !== null && (
               <div
                 className={`rounded-lg border px-4 py-2.5 text-sm ${
                   lastResult.length > 0
@@ -347,46 +517,48 @@ export default function Session() {
                 }`}
               >
                 {lastResult.length > 0
-                  ? `✓ Recognized & Verified: ${lastResult.map((f) => f.name).join(", ")}`
-                  : "No registered faces recognized in last scan"}
+                  ? `✓ Recognized: ${lastResult.map((f) => f.name).join(", ")}`
+                  : "No registered faces recognized in frame"}
               </div>
             )}
 
+            {/* Scan Action Buttons */}
             <div className="flex gap-2">
               <button
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
+                className="btn-primary flex-1 flex items-center justify-center gap-2 py-2.5"
                 onClick={handleScan}
                 disabled={scanning}
               >
                 {scanning ? (
                   <>
-                    <Loader2 size={15} className="animate-spin" /> Scanning…
+                    <Loader2 size={15} className="animate-spin" /> Analyzing Frame…
                   </>
                 ) : (
                   <>
-                    <CameraIcon size={15} /> Scan & Mark
+                    <CameraIcon size={15} />
+                    {scanMode === "kiosk" ? "Check-In Student" : "Scan & Mark Attendance"}
                   </>
                 )}
               </button>
-              <button
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border ${
-                  autoScan
-                    ? "bg-amber-700/40 border-amber-600 text-amber-300 hover:bg-amber-700/60"
-                    : "btn-secondary"
-                }`}
-                onClick={() => setAutoScan((a) => !a)}
-              >
-                <RefreshCw size={15} className={autoScan ? "animate-spin" : ""} />
-                {autoScan ? "Auto ON" : "Auto OFF"}
-              </button>
+
+              {scanMode === "group" && (
+                <button
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border ${
+                    autoScan
+                      ? "bg-amber-700/40 border-amber-600 text-amber-300 hover:bg-amber-700/60"
+                      : "btn-secondary"
+                  }`}
+                  onClick={() => setAutoScan((a) => !a)}
+                >
+                  <RefreshCw size={15} className={autoScan ? "animate-spin" : ""} />
+                  {autoScan ? "Auto-Scanning ON" : "Auto-Scanning OFF"}
+                </button>
+              )}
             </div>
-            <p className="text-xs text-gray-600 text-center">
-              Atomic server validation: Anti-spoofing + Face Match + GPS + Rolling Code + Device Binding
-            </p>
           </div>
         )}
 
-        {/* Right panel: present / all students */}
+        {/* Right Panel: Present / All Students Roster */}
         <div className="space-y-3">
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-800">
@@ -408,11 +580,11 @@ export default function Session() {
             ))}
           </div>
 
-          {/* Present tab */}
+          {/* Present Tab */}
           {rightTab === "present" &&
             (presentList.length === 0 ? (
-              <div className="card text-center py-10 text-gray-600 text-sm">
-                {session.is_active ? "Start scanning to mark attendance." : "No attendance recorded."}
+              <div className="card text-center py-10 text-gray-500 text-sm">
+                {session.is_active ? "No students marked yet. Align faces with camera." : "No attendance recorded."}
               </div>
             ) : (
               <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
@@ -421,22 +593,22 @@ export default function Session() {
                   .map((r) => (
                     <div
                       key={r.student_id}
-                      className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5"
+                      className="flex items-center gap-3 bg-gray-900/90 border border-gray-800/80 rounded-xl px-3 py-2.5 hover:border-gray-700 transition-colors"
                     >
                       <CheckCircle size={16} className="text-green-400 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-100 text-sm truncate">{r.name}</p>
-                        <p className="text-xs text-gray-600">{r.enrollment}</p>
+                        <p className="text-xs text-gray-500">{r.enrollment}</p>
                       </div>
-                      <span className="text-xs text-gray-500 shrink-0">
-                        {r.confidence > 0 ? `${r.confidence?.toFixed(1)}%` : "Teacher Manual"}
+                      <span className="text-xs text-gray-400 shrink-0 bg-gray-800/80 px-2 py-0.5 rounded-md border border-gray-700">
+                        {r.confidence > 0 ? `${r.confidence?.toFixed(1)}%` : "Manual"}
                       </span>
                       {session.is_active && (
                         <button
                           onClick={() => handleUnmark(r.student_id)}
                           disabled={marking === r.student_id}
-                          className="text-gray-600 hover:text-red-400 transition-colors p-1 shrink-0"
-                          title="Remove"
+                          className="text-gray-500 hover:text-red-400 transition-colors p-1 shrink-0"
+                          title="Remove Attendance"
                         >
                           {marking === r.student_id ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -450,77 +622,50 @@ export default function Session() {
               </div>
             ))}
 
-          {/* All Students tab */}
-          {rightTab === "all" &&
-            (allStudents.length === 0 ? (
-              <div className="card text-center py-10 text-gray-600 text-sm">
-                No students registered.
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
-                {[...allStudents]
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((s) => {
-                    const isPresent = !!presentMap[s.id];
-                    return (
+          {/* All Students Tab (Teacher Manual Override) */}
+          {rightTab === "all" && (
+            <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
+              {allStudents
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((s) => {
+                  const isPresent = Boolean(presentMap[s.id]);
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-3 bg-gray-900/80 border border-gray-800 rounded-xl px-3 py-2"
+                    >
                       <div
-                        key={s.id}
-                        className={`flex items-center gap-3 border rounded-lg px-3 py-2.5 ${
-                          isPresent
-                            ? "bg-green-900/10 border-green-800/50"
-                            : "bg-gray-900 border-gray-800"
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isPresent ? "bg-green-400" : "bg-gray-600"
                         }`}
-                      >
-                        {isPresent ? (
-                          <CheckCircle size={15} className="text-green-400 shrink-0" />
-                        ) : (
-                          <div className="w-[15px] h-[15px] rounded-full border border-gray-600 shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-100 text-sm truncate">{s.name}</p>
-                          <p className="text-xs text-gray-600">{s.enrollment}</p>
-                        </div>
-                        {session.is_active &&
-                          (isPresent ? (
-                            <button
-                              onClick={() => handleUnmark(s.id)}
-                              disabled={marking === s.id}
-                              className="text-xs text-red-400 hover:text-red-300 border border-red-800 hover:border-red-600 px-2 py-1 rounded-md transition-colors shrink-0"
-                            >
-                              {marking === s.id ? (
-                                <Loader2 size={11} className="animate-spin" />
-                              ) : (
-                                "Unmark"
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleManualMark(s)}
-                              disabled={marking === s.id}
-                              className="text-xs text-green-400 hover:text-green-300 border border-green-800 hover:border-green-600 px-2 py-1 rounded-md transition-colors shrink-0 flex items-center gap-1"
-                            >
-                              {marking === s.id ? (
-                                <Loader2 size={11} className="animate-spin" />
-                              ) : (
-                                <>
-                                  <UserCheck size={11} /> Mark
-                                </>
-                              )}
-                            </button>
-                          ))}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-200 text-sm truncate">{s.name}</p>
+                        <p className="text-xs text-gray-500">{s.enrollment}</p>
                       </div>
-                    );
-                  })}
-              </div>
-            ))}
-
-          {!session.is_active && presentList.length > 0 && (
-            <button
-              className="btn-secondary w-full flex items-center justify-center gap-2 mt-2"
-              onClick={() => downloadExcel(parseInt(id))}
-            >
-              <Download size={14} /> Download Excel Report
-            </button>
+                      {session.is_active && (
+                        <button
+                          onClick={() => (isPresent ? handleUnmark(s.id) : handleManualMark(s))}
+                          disabled={marking === s.id}
+                          className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                            isPresent
+                              ? "bg-red-950/60 border border-red-800 text-red-300 hover:bg-red-900/60"
+                              : "bg-indigo-950/60 border border-indigo-800 text-indigo-300 hover:bg-indigo-900/60"
+                          }`}
+                        >
+                          {marking === s.id ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : isPresent ? (
+                            "Unmark"
+                          ) : (
+                            "Manual Mark"
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
           )}
         </div>
       </div>

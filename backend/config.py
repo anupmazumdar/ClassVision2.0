@@ -11,6 +11,9 @@ ATTENDANCE_TICKET_SECRET = os.getenv("ATTENDANCE_TICKET_SECRET", "cv-attendance-
 # Biometric Encryption at Rest Key (Fernet 32-byte urlsafe base64)
 FACE_ENCRYPTION_KEY = os.getenv("FACE_ENCRYPTION_KEY", "E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=")
 
+# Face Recognition Matching Threshold (Tuned for multi-angle registration: 0.75-0.85)
+FACE_SIMILARITY_THRESHOLD = float(os.getenv("FACE_SIMILARITY", "0.78"))
+
 TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
 JWT_ALGORITHM = "HS256"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")

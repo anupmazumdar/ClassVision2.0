@@ -1,17 +1,17 @@
 import base64
 import io
 import json
-import os
 from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 from PIL import Image
 
+from config import FACE_SIMILARITY_THRESHOLD
+
 _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 _FACE_SIZE = (64, 64)
 _HOG = cv2.HOGDescriptor(_FACE_SIZE, (16, 16), (8, 8), (8, 8), 9)
-_THRESHOLD = float(os.getenv("FACE_SIMILARITY", "0.82"))
 
 
 def decode_image(b64: str) -> np.ndarray:
@@ -29,17 +29,26 @@ def _hog_vec(gray_face: np.ndarray) -> np.ndarray:
     return desc / norm if norm > 0 else desc
 
 
-def _face_vecs(rgb: np.ndarray) -> List[np.ndarray]:
+def _face_vecs_with_boxes(rgb: np.ndarray) -> List[Tuple[np.ndarray, Tuple[int, int, int, int]]]:
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    faces = _CASCADE.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-    return [_hog_vec(gray[y : y + h, x : x + w]) for (x, y, w, h) in faces]
+    faces = _CASCADE.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    results = []
+    for (x, y, w, h) in faces:
+        vec = _hog_vec(gray[y : y + h, x : x + w])
+        results.append((vec, (int(x), int(y), int(w), int(h))))
+    return results
 
 
 def extract_encodings(image_array: np.ndarray) -> List[List[float]]:
-    return [v.tolist() for v in _face_vecs(image_array)]
+    pairs = _face_vecs_with_boxes(image_array)
+    return [vec.tolist() for vec, _ in pairs]
 
 
 def recognize_faces(image_array: np.ndarray, students: list) -> List[dict]:
+    """
+    Recognizes faces in the input image against registered student face encodings.
+    Evaluates multi-angle templates per student and returns student match with bounding box.
+    """
     h, w = image_array.shape[:2]
     scale = 0.5 if max(h, w) > 640 else 1.0
     if scale < 1.0:
@@ -47,41 +56,62 @@ def recognize_faces(image_array: np.ndarray, students: list) -> List[dict]:
     else:
         small = image_array
 
-    query_vecs = _face_vecs(small)
-    if not query_vecs:
+    query_pairs = _face_vecs_with_boxes(small)
+    if not query_pairs:
         return []
 
-    known_vecs: List[np.ndarray] = []
-    known_owners: list = []
+    # Map students and their multi-angle encodings
+    known_data = []
     for s in students:
         try:
             stored = json.loads(s.face_encodings or "[]")
-            for v in stored:
-                known_vecs.append(np.array(v, dtype=np.float64))
-                known_owners.append(s)
+            if stored:
+                vecs = [np.array(v, dtype=np.float64) for v in stored if len(v) > 0]
+                if vecs:
+                    known_data.append({"student": s, "vecs": vecs})
         except (json.JSONDecodeError, ValueError):
             continue
 
-    if not known_vecs:
+    if not known_data:
         return []
 
     seen_ids = set()
     results = []
-    for qv in query_vecs:
-        sims = [float(np.dot(qv, kv)) for kv in known_vecs]
-        best_idx = int(np.argmax(sims))
-        best_sim = sims[best_idx]
 
-        if best_sim >= _THRESHOLD:
-            student = known_owners[best_idx]
-            if student.id not in seen_ids:
-                seen_ids.add(student.id)
+    for qv, (sx, sy, sw, sh) in query_pairs:
+        # Scale box back to original image coordinates if downscaled
+        orig_box = [
+            int(sx / scale),
+            int(sy / scale),
+            int(sw / scale),
+            int(sh / scale),
+        ]
+
+        best_student = None
+        highest_sim = -1.0
+
+        for entry in known_data:
+            # Multi-angle match: calculate dot product against all registered angles for student
+            sims = [float(np.dot(qv, kv)) for kv in entry["vecs"]]
+            max_for_student = max(sims) if sims else 0.0
+
+            if max_for_student > highest_sim:
+                highest_sim = max_for_student
+                best_student = entry["student"]
+
+        if highest_sim >= FACE_SIMILARITY_THRESHOLD and best_student:
+            if best_student.id not in seen_ids:
+                seen_ids.add(best_student.id)
+                # Map similarity (0.78-1.0) into intuitive confidence score (80%-99.9%)
+                conf_pct = min(99.9, max(60.0, ((highest_sim - 0.5) / 0.5) * 100))
                 results.append(
                     {
-                        "student_id": student.id,
-                        "name": student.name,
-                        "enrollment": student.enrollment,
-                        "confidence": round(best_sim * 100, 1),
+                        "student_id": best_student.id,
+                        "name": best_student.name,
+                        "enrollment": best_student.enrollment,
+                        "confidence": round(conf_pct, 1),
+                        "similarity": round(highest_sim, 3),
+                        "box": orig_box,
                     }
                 )
 
@@ -113,7 +143,6 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
     # Check 2: Micro-motion delta between consecutive frames
     diffs = []
     for i in range(len(grays) - 1):
-        # Resize to same dimension if needed
         g1 = cv2.resize(grays[i], (320, 240))
         g2 = cv2.resize(grays[i + 1], (320, 240))
         diff = cv2.absdiff(g1, g2)
