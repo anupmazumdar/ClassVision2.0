@@ -37,6 +37,10 @@ def init_db():
             st_cols = {row[1] for row in st_result}
             if "device_id" not in st_cols:
                 conn.exec_driver_sql("ALTER TABLE students ADD COLUMN device_id VARCHAR")
+            if "consent_given" not in st_cols:
+                conn.exec_driver_sql("ALTER TABLE students ADD COLUMN consent_given BOOLEAN DEFAULT 0")
+            if "consent_at" not in st_cols:
+                conn.exec_driver_sql("ALTER TABLE students ADD COLUMN consent_at DATETIME")
             conn.commit()
         except Exception:
             pass

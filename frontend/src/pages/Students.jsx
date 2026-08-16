@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus, Search, CheckCircle, AlertCircle, Trash2, Loader2 } from "lucide-react";
+import { UserPlus, Search, CheckCircle, AlertCircle, Trash2, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { getStudents, deleteStudent } from "../api/client";
 import { useAuth } from "../App";
 
@@ -13,27 +13,26 @@ export default function Students() {
   const [deleting, setDeleting] = useState(null);
 
   const load = () => {
-    setLoading(true);
     getStudents()
       .then(setStudents)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(load, []);
 
   const filtered = students.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.enrollment.toLowerCase().includes(search.toLowerCase()) ||
-      s.department.toLowerCase().includes(search.toLowerCase())
+      (s.department || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Delete ${name}? This will also remove their attendance records.`)) return;
+    if (!confirm(`Delete ${name}? All attendance records will be removed.`)) return;
     setDeleting(id);
     try {
       await deleteStudent(id);
-      setStudents((s) => s.filter((st) => st.id !== id));
+      setStudents((prev) => prev.filter((s) => s.id !== id));
     } finally {
       setDeleting(null);
     }
@@ -80,7 +79,8 @@ export default function Students() {
                 <th className="text-left px-4 py-3">Name</th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell">Enrollment</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Department</th>
-                <th className="text-center px-4 py-3">Face</th>
+                <th className="text-center px-4 py-3">Biometrics</th>
+                <th className="text-center px-4 py-3">Consent</th>
                 {user?.role === "admin" && <th className="px-4 py-3" />}
               </tr>
             </thead>
@@ -95,9 +95,23 @@ export default function Students() {
                   <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{s.department || "—"}</td>
                   <td className="px-4 py-3 text-center">
                     {s.has_face ? (
-                      <span className="badge-green"><CheckCircle size={11} /> Registered</span>
+                      <span className="badge-green"><CheckCircle size={11} /> Encrypted</span>
                     ) : (
                       <span className="badge-red"><AlertCircle size={11} /> Missing</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {s.consent_given ? (
+                      <span
+                        className="badge-green"
+                        title={s.consent_at ? `Consent recorded: ${new Date(s.consent_at).toLocaleString()}` : "Granted"}
+                      >
+                        <ShieldCheck size={11} /> Granted
+                      </span>
+                    ) : (
+                      <span className="badge-amber">
+                        <ShieldAlert size={11} /> Missing
+                      </span>
                     )}
                   </td>
                   {user?.role === "admin" && (
@@ -105,9 +119,10 @@ export default function Students() {
                       <button
                         onClick={() => handleDelete(s.id, s.name)}
                         disabled={deleting === s.id}
-                        className="text-gray-600 hover:text-red-400 transition-colors p-1"
+                        className="p-1 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                        title="Delete student"
                       >
-                        {deleting === s.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {deleting === s.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                       </button>
                     </td>
                   )}

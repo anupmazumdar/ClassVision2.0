@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -27,6 +28,12 @@ def create_student(db: Session, *, enrollment: str, name: str, department: str, 
 
 def update_student_face_encodings(db: Session, student: Student, encodings_json: str) -> None:
     student.face_encodings = encodings_json
+    db.commit()
+
+
+def record_face_consent(db: Session, student: Student) -> None:
+    student.consent_given = True
+    student.consent_at = datetime.utcnow()
     db.commit()
 
 

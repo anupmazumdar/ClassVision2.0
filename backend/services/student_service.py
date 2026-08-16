@@ -1,10 +1,10 @@
 import json
+from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from repositories import student_repo
-
 from .face_service import decode_image, extract_encodings
 
 
@@ -17,6 +17,9 @@ def list_students(db: Session) -> list[dict]:
             "name": s.name,
             "department": s.department,
             "has_face": bool(json.loads(s.face_encodings or "[]")),
+            "consent_given": bool(s.consent_given),
+            "consent_at": s.consent_at.isoformat() if s.consent_at else None,
+            "device_id": s.device_id,
             "created_at": s.created_at.isoformat(),
         }
         for s in students
@@ -32,7 +35,13 @@ def create_student(db: Session, enrollment: str, name: str, department: str) -> 
     return {"id": student.id, "enrollment": student.enrollment, "name": student.name}
 
 
-def register_face(db: Session, student_id: int, images: list[str]) -> dict:
+def register_face(db: Session, student_id: int, images: list[str], consent: bool = False) -> dict:
+    if not consent:
+        raise HTTPException(
+            status_code=400,
+            detail="Biometric Compliance: Consent is required before facial biometric data can be registered.",
+        )
+
     student = student_repo.get_student_by_id(db, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -52,7 +61,12 @@ def register_face(db: Session, student_id: int, images: list[str]) -> dict:
         )
 
     student_repo.update_student_face_encodings(db, student, json.dumps(all_encodings))
-    return {"message": f"Registered {len(all_encodings)} face encoding(s) for {student.name}"}
+    student_repo.record_face_consent(db, student)
+
+    return {
+        "message": f"Registered {len(all_encodings)} face encoding(s) for {student.name}",
+        "consent_recorded": True,
+    }
 
 
 def delete_student(db: Session, student_id: int) -> None:

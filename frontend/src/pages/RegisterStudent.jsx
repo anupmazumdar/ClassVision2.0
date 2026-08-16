@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera as CameraIcon, CheckCircle, Loader2, Trash2, UserPlus } from "lucide-react";
+import { Camera as CameraIcon, CheckCircle, Loader2, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import Camera from "../components/Camera";
 import { createStudent, registerFace } from "../api/client";
 
@@ -12,6 +12,7 @@ export default function RegisterStudent() {
   const [form, setForm] = useState({ enrollment: "", name: "", department: "" });
   const [student, setStudent] = useState(null);
   const [photos, setPhotos] = useState([]); // base64 strings
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -49,10 +50,14 @@ export default function RegisterStudent() {
       setFeedback("Capture at least 1 photo.");
       return;
     }
+    if (!consent) {
+      setFeedback("Biometric consent is required before registering facial data.");
+      return;
+    }
     setLoading(true);
     setFeedback("");
     try {
-      await registerFace(student.id, photos);
+      await registerFace(student.id, photos, consent);
       // Stop camera before moving to done step
       camRef.current?.stop();
       setStep("done");
@@ -93,28 +98,34 @@ export default function RegisterStudent() {
       {step === "info" && (
         <div className="card">
           <form onSubmit={handleCreateStudent} className="space-y-4">
+            {error && (
+              <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
             <div>
               <label className="label">Enrollment Number *</label>
               <input
                 className="input"
-                placeholder="e.g. 2301001"
+                placeholder="e.g. CS2024001"
                 value={form.enrollment}
                 onChange={(e) => setForm({ ...form, enrollment: e.target.value })}
                 required
+                autoFocus
               />
             </div>
             <div>
               <label className="label">Full Name *</label>
               <input
                 className="input"
-                placeholder="e.g. Anup Mazumdar"
+                placeholder="e.g. Alex Johnson"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="label">Department</label>
+              <label className="label">Department / Branch (optional)</label>
               <input
                 className="input"
                 placeholder="e.g. Computer Science"
@@ -122,11 +133,6 @@ export default function RegisterStudent() {
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
               />
             </div>
-            {error && (
-              <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
             <div className="flex gap-3 pt-1">
               <button type="button" className="btn-secondary flex-1" onClick={() => navigate("/students")}>
                 Cancel
@@ -178,6 +184,24 @@ export default function RegisterStudent() {
             </div>
           )}
 
+          {/* Biometric Consent Checkbox */}
+          <div className="card bg-gray-900/80 border border-gray-800 p-3.5 rounded-xl text-xs space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer text-gray-300 hover:text-gray-100">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
+              />
+              <span>
+                <strong className="text-indigo-300 flex items-center gap-1 inline-flex">
+                  <ShieldCheck size={13} className="text-green-400" /> Biometric Privacy Consent:
+                </strong>{" "}
+                I confirm that the student/guardian has provided explicit consent to capture, process, and securely encrypt facial biometric templates at rest for academic attendance verification.
+              </span>
+            </label>
+          </div>
+
           {feedback && (
             <p className="text-amber-400 text-sm bg-amber-900/20 border border-amber-800 rounded-lg px-3 py-2">
               {feedback}
@@ -189,7 +213,7 @@ export default function RegisterStudent() {
             <button
               className="btn-primary flex-1 flex items-center justify-center gap-2"
               onClick={handleRegisterFace}
-              disabled={loading || photos.length === 0}
+              disabled={loading || photos.length === 0 || !consent}
             >
               {loading ? <><Loader2 size={15} className="animate-spin" /> Registering…</> : "Register Face"}
             </button>
@@ -205,10 +229,10 @@ export default function RegisterStudent() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-100">{student?.name} registered!</h2>
-            <p className="text-gray-500 text-sm mt-1">Face recognized from {photos.length} photo(s). Ready for attendance.</p>
+            <p className="text-gray-500 text-sm mt-1">Face template encrypted with AES-128 & consent recorded. Ready for attendance.</p>
           </div>
           <div className="flex gap-3 justify-center">
-            <button className="btn-secondary" onClick={() => { setStep("info"); setForm({ enrollment:"",name:"",department:""}); setPhotos([]); setStudent(null); camRef.current?.stop(); }}>
+            <button className="btn-secondary" onClick={() => { setStep("info"); setForm({ enrollment:"",name:"",department:""}); setPhotos([]); setStudent(null); setConsent(false); camRef.current?.stop(); }}>
               Register Another
             </button>
             <button className="btn-primary" onClick={() => { camRef.current?.stop(); navigate("/students"); }}>

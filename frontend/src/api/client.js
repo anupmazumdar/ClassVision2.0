@@ -33,8 +33,8 @@ export const getStudents = () => client.get("/students").then((r) => r.data);
 export const createStudent = (data) =>
   client.post("/students", data).then((r) => r.data);
 
-export const registerFace = (studentId, images) =>
-  client.post(`/students/${studentId}/register-face`, { images }).then((r) => r.data);
+export const registerFace = (studentId, images, consent = false) =>
+  client.post(`/students/${studentId}/register-face`, { images, consent }).then((r) => r.data);
 
 export const deleteStudent = (studentId) => client.delete(`/students/${studentId}`);
 

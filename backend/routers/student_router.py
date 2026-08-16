@@ -30,7 +30,7 @@ def register_face(
     db: Session = Depends(get_db),
     _: dict = Depends(require_teacher_or_admin),
 ):
-    return student_service.register_face(db, student_id, body.images)
+    return student_service.register_face(db, student_id, body.images, consent=body.consent)
 
 
 @router.delete("/{student_id}", status_code=204)

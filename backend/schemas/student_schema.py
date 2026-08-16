@@ -1,5 +1,4 @@
 from typing import List
-
 from pydantic import BaseModel
 
 
@@ -11,3 +10,4 @@ class StudentCreate(BaseModel):
 
 class FaceRegisterRequest(BaseModel):
     images: List[str]
+    consent: bool = False
