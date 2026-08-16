@@ -9,6 +9,7 @@ from fastapi import HTTPException
 
 from config import ATTENDANCE_TICKET_SECRET, JWT_SECRET, SESSION_CODE_SECRET
 from database import SessionLocal, init_db
+from middleware.jwt_middleware import require_teacher_or_admin
 from models import ClassSession, Student, User
 from repositories import attendance_repo, session_repo, student_repo, user_repo
 from services import attendance_service, face_service, session_service, student_service
@@ -306,6 +307,27 @@ def test_hardened_security():
         man_res = attendance_service.manual_mark_teacher(db, session_full_sec_2.id, st_manual.id)
         assert man_res["already_present"] is False
         print("   6A. Teacher manual override -> recorded present with 0 confidence.")
+
+        # -------------------------------------------------------------
+        # 7. REPORT & PRIVACY ROLE-BASED ACCESS CONTROL (RBAC)
+        # -------------------------------------------------------------
+        print("\n7. Testing Report & Privacy Role-Based Access Control...")
+        student_user = {"sub": "999", "role": "student", "email": "student@test.com"}
+        teacher_user = {"sub": "100", "role": "teacher", "email": "teacher@test.com"}
+        admin_user = {"sub": "1", "role": "admin", "email": "admin@test.com"}
+
+        # Student role must be blocked from report downloads / summary / email relays
+        try:
+            require_teacher_or_admin(student_user)
+            assert False, "Student role should be denied access to reports"
+        except HTTPException as e:
+            assert e.status_code == 403
+            print(f"   7A. Student access to reports/privacy endpoints -> correctly blocked ({e.detail})")
+
+        # Teacher & Admin roles must pass
+        assert require_teacher_or_admin(teacher_user) == teacher_user
+        assert require_teacher_or_admin(admin_user) == admin_user
+        print("   7B. Teacher & Admin access to reports -> successfully authorized.")
 
         # Clean up
         student_service.delete_student(db, st_crypto.id)
