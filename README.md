@@ -274,11 +274,24 @@ ClassVision/
 
 ---
 
-## 🔑 Default Credentials
+### 📱 Dual Mobile Attendance Models
 
-- **Email:** `admin@classvision.local`
-- **Password:** `admin123`
-- **Role:** `admin`
+ClassVision Mobile supports two distinct institutional deployment workflows:
+1. **👨‍🏫 Mode A: Faculty-Operated Handheld Kiosk**
+   - The instructor/TA logs into the mobile app on a class tablet or smartphone mounted at the entrance.
+   - Students queue up and glance at the front camera in **⚡ 1-by-1 Kiosk Mode** for hands-free verification and celebration chime feedback.
+2. **🎓 Mode B: Student Self-Check-in**
+   - Each student signs in on their personal smartphone with their student account.
+   - They enter the teacher's active 6-digit rolling session code from the projector screen and capture their own selfie within the physical classroom geofence.
+
+---
+
+## 🔑 Default Development Credentials
+
+| Role | Email | Password | Intended Workflow |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@classvision.local` | `admin123` | Full dashboard, student registry, system config |
+| **Student** | `student@classvision.local` | `student123` | Mobile app 1-tap check-in, personal profile |
 
 *(In production environments, generate decoupled keys using `python backend/scripts/generate_secrets.py`.)*
 

@@ -38,10 +38,20 @@ def seed_default_admin(db: Session, *, name: str, email: str, password: str) -> 
     if user_repo.count_users(db) > 0:
         return
 
+    # Seed default Admin
     user_repo.create_user(
         db,
         name=name,
         email=email,
         password_hash=hash_password(password),
         role="admin",
+    )
+
+    # Seed default Demo Student
+    user_repo.create_user(
+        db,
+        name="Demo Student",
+        email="student@classvision.local",
+        password_hash=hash_password("student123"),
+        role="student",
     )
