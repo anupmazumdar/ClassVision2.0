@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from config import ATTENDANCE_TICKET_SECRET
+from middleware.jwt_middleware import check_code_rate_limit, record_failed_code
 from repositories import attendance_repo, session_repo, student_repo
 from .face_service import decode_image, recognize_faces, verify_liveness
 from .session_service import verify_session_code
@@ -178,9 +179,12 @@ def scan_and_mark_atomic(
     if not session or not session.is_active:
         raise HTTPException(status_code=400, detail="Session not found or not active")
 
-    # 1. Rotating Code Check
+    # 1. Rotating Code Check with Rate Limiting (5 attempts / 30s)
     if session.require_code:
+        rate_key = f"{session_id}:{device_id or 'anon'}"
+        check_code_rate_limit(rate_key, max_attempts=5, window_seconds=30)
         if not code or not verify_session_code(session_id, code):
+            record_failed_code(rate_key)
             raise HTTPException(
                 status_code=400,
                 detail="Invalid or expired session code. Please enter the current 6-digit code shown on screen.",
@@ -309,9 +313,12 @@ def mark_attendance_with_ticket(
     ticket_payload = verify_attendance_ticket(attendance_ticket, session_id, student_id)
     verified_confidence = ticket_payload.get("confidence", 0.0)
 
-    # 2. Rotating Code Verification
+    # 2. Rotating Code Verification with Rate Limiting (5 attempts / 30s)
     if session.require_code:
+        rate_key = f"{session_id}:{device_id or 'anon'}"
+        check_code_rate_limit(rate_key, max_attempts=5, window_seconds=30)
         if not code or not verify_session_code(session_id, code):
+            record_failed_code(rate_key)
             raise HTTPException(
                 status_code=400,
                 detail="Invalid or expired session code. Please enter the current 6-digit code shown on screen.",

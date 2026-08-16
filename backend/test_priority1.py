@@ -242,9 +242,62 @@ def test_hardened_security():
             print(f"   4C. Device proxy attempt -> correctly rejected with HTTP 403 ({e.detail})")
 
         # -------------------------------------------------------------
-        # 5. TEACHER MANUAL MARK
+        # 5. SESSION CODE BRUTE-FORCE RATE LIMITING
         # -------------------------------------------------------------
-        print("\n5. Testing Teacher/Admin Manual Mark Override...")
+        print("\n5. Testing Session-Code Brute-Force Rate Limiting...")
+        session_rate_test = session_repo.create_session(
+            db,
+            subject="Rate Limited Class",
+            room="Room 502",
+            teacher_id=teacher.id,
+            require_code=True,
+        )
+        st_rate = student_repo.get_student_by_enrollment(db, "RATE_01")
+        if st_rate:
+            student_service.delete_student(db, st_rate.id)
+        st_rate = student_repo.create_student(db, enrollment="RATE_01", name="Rate Student", department="CS")
+
+        rate_device = "device-brute-tester"
+        ticket_rate = attendance_service.generate_attendance_ticket(
+            session_id=session_rate_test.id,
+            student_id=st_rate.id,
+            confidence=95.0,
+            device_id=rate_device,
+        )
+
+        # Send 5 wrong code guesses
+        for attempt_i in range(5):
+            try:
+                attendance_service.mark_attendance_with_ticket(
+                    db,
+                    session_id=session_rate_test.id,
+                    student_id=st_rate.id,
+                    attendance_ticket=ticket_rate,
+                    code="000000",
+                    device_id=rate_device,
+                )
+            except HTTPException as e:
+                assert e.status_code == 400
+
+        # 6th attempt should now be rate limited with HTTP 429
+        try:
+            attendance_service.mark_attendance_with_ticket(
+                db,
+                session_id=session_rate_test.id,
+                student_id=st_rate.id,
+                attendance_ticket=ticket_rate,
+                code="000000",
+                device_id=rate_device,
+            )
+            assert False, "6th attempt should have triggered HTTP 429 rate limit"
+        except HTTPException as e:
+            assert e.status_code == 429, f"Expected 429, got {e.status_code}"
+            print(f"   5A. Brute-force code guessing correctly locked out with HTTP 429 ({e.detail})")
+
+        # -------------------------------------------------------------
+        # 6. TEACHER MANUAL MARK
+        # -------------------------------------------------------------
+        print("\n6. Testing Teacher/Admin Manual Mark Override...")
         st_manual = student_repo.get_student_by_enrollment(db, "MANUAL_01")
         if st_manual:
             student_service.delete_student(db, st_manual.id)
@@ -252,15 +305,17 @@ def test_hardened_security():
 
         man_res = attendance_service.manual_mark_teacher(db, session_full_sec_2.id, st_manual.id)
         assert man_res["already_present"] is False
-        print("   5A. Teacher manual override -> recorded present with 0 confidence.")
+        print("   6A. Teacher manual override -> recorded present with 0 confidence.")
 
         # Clean up
         student_service.delete_student(db, st_crypto.id)
         student_service.delete_student(db, st_sec.id)
+        student_service.delete_student(db, st_rate.id)
         student_service.delete_student(db, st_manual.id)
         session_service.delete_session(db, session_ticket_test.id)
         session_service.delete_session(db, session_full_sec.id)
         session_service.delete_session(db, session_full_sec_2.id)
+        session_service.delete_session(db, session_rate_test.id)
 
         print("\n=======================================================")
         print("ALL CRITICAL HARDENED SECURITY CHECKS PASSED PERFECTLY!")
