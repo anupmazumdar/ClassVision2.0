@@ -9,6 +9,7 @@ import Session from "./pages/Session";
 import Reports from "./pages/Reports";
 import Users from "./pages/Users";
 import NavBar from "./components/NavBar";
+import InstallPrompt from "./components/InstallPrompt";
 
 // ── Auth context ──────────────────────────────────────────────────────────────
 export const AuthContext = createContext(null);
@@ -113,6 +114,7 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <InstallPrompt />
       </BrowserRouter>
     </AuthProvider>
   );

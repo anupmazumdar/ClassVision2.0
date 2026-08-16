@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "ClassVision",
+    "slug": "classvision-mobile",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#030712"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.classvision.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ClassVision requires camera access for facial biometric attendance check-in.",
+        "NSLocationWhenInUseUsageDescription": "ClassVision requires GPS access to verify classroom geofence proximity."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#030712"
+      },
+      "package": "com.classvision.app",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow ClassVision to access your camera for attendance scanning."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow ClassVision to verify your classroom presence."
+        }
+      ]
+    ]
+  }
+}

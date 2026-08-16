@@ -199,6 +199,19 @@ ClassVision/
 
 ---
 
+### Step 3 — Mobile PWA & React Native Client
+
+- **PWA (Instant Mobile Browser Install)**: Open `http://<your-lan-ip>:5173` on any mobile device (iOS Safari or Android Chrome) and tap **"Install ClassVision App"** for 1-tap full-screen biometric check-in.
+- **React Native Mobile App (`mobile/`)**:
+  ```bash
+  cd mobile
+  npm install
+  npm start
+  ```
+  *(Supports Android APK builds and iOS deployment via Expo EAS).*
+
+---
+
 ## 🔑 Default Credentials
 
 - **Email:** `admin@classvision.local`

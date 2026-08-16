@@ -1,12 +1,14 @@
 {
-  "name": "ClassVision",
+  "name": "ClassVision 2.0 — Smart Attendance",
   "short_name": "ClassVision",
-  "description": "AI-powered attendance and classroom analytics",
+  "description": "AI-Powered Biometric Smart Attendance & Security System",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#030712",
-  "theme_color": "#1e1b4b",
-  "orientation": "any",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -19,6 +21,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }
