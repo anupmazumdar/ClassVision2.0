@@ -92,10 +92,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          <p className="text-center text-xs text-gray-600 mt-4">
-            Default: admin@classvision.local / admin123
-          </p>
         </div>
       </div>
     </div>
