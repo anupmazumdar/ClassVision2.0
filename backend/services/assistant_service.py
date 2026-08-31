@@ -13,10 +13,10 @@ KNOWLEDGE_BASE = [
             "• **1-Click AI Group Scanning**: Instantly mark present students using multi-face detection.\n"
             "• **100m GPS Geofenced Self Check-in**: Students not captured in group scan can self check in at `/checkin` within 100m of the teacher.\n"
             "• **Rotating 6-Digit Rolling Code**: Live TOTP security code that changes every 30 seconds to stop proxy check-ins.\n"
-            "• **Google Classroom Study Hub**: Upload and share Notes, PDFs, Assignments with deadlines, Tests, and Syllabus.\n"
+            "• **Study Materials & Assignments Hub**: Upload and share Notes, PDFs, Assignments with deadlines, Tests, and Syllabus.\n"
             "• **1-Click WhatsApp Broadcasts**: Share live codes, attendance summaries, and study materials straight to class groups."
         ),
-        "suggestions": ["How do students self check-in?", "How does 100m geofence work?", "How to use Google Classroom hub?"],
+        "suggestions": ["How do students self check-in?", "How does 100m geofence work?", "How to post study materials & notes?"],
         "action": {"label": "Open Dashboard", "link": "/"}
     },
     {
@@ -51,11 +51,11 @@ KNOWLEDGE_BASE = [
     },
     {
         "id": "classroom_hub",
-        "keywords": ["classroom", "notes", "pdf", "assignment", "test", "study material", "homework", "upload notes", "notes kaise dale", "assignment kaise post kare", "google classroom"],
-        "title": "Google Classroom Learning Hub",
+        "keywords": ["classroom", "notes", "pdf", "assignment", "test", "study material", "homework", "upload notes", "notes kaise dale", "assignment kaise post kare", "materials"],
+        "title": "Study Materials & Assignments Hub",
         "reply": (
-            "📚 **Google Classroom Study Hub:**\n\n"
-            "Teachers and Students have a built-in study hub under **[Classroom](/classroom)**:\n\n"
+            "📚 **Study Materials & Assignments Hub:**\n\n"
+            "Teachers and Students have a built-in academics hub under **[Classroom](/classroom)**:\n\n"
             "1. **Study Notes & Lecture Docs**: Post topic summaries and reading handouts.\n"
             "2. **PDF Documents**: Attach Google Drive links or direct downloadable references.\n"
             "3. **Assignments**: Post homework tasks with due dates and total marks.\n"
@@ -63,7 +63,7 @@ KNOWLEDGE_BASE = [
             "5. **1-Click WhatsApp Broadcast**: Click the green WhatsApp icon on any material card to broadcast it directly to students' WhatsApp group!"
         ),
         "suggestions": ["How to post new material?", "How to filter by branch/year?", "How to share material to WhatsApp?"],
-        "action": {"label": "Open Classroom Hub", "link": "/classroom"}
+        "action": {"label": "Open Study Materials", "link": "/classroom"}
     },
     {
         "id": "whatsapp_integration",

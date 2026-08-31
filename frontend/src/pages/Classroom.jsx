@@ -171,10 +171,10 @@ export default function Classroom() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2.5">
-            <BookOpen className="text-indigo-400" /> Google Classroom Learning Hub
+            <BookOpen className="text-indigo-400" /> Study Materials & Assignments
           </h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            Study Notes, PDFs, Assignments, Test Schedules & 1-Click WhatsApp Broadcasts
+            Notes, PDFs, Homework Assignments, Test Schedules & 1-Click WhatsApp Broadcasts
           </p>
         </div>
 
@@ -405,11 +405,11 @@ export default function Classroom() {
 
       {/* POST MATERIAL MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 my-auto max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
               <h2 className="text-lg font-bold text-gray-100 flex items-center gap-2">
-                <Sparkles size={18} className="text-indigo-400" /> Post New Classroom Material
+                <Sparkles size={18} className="text-indigo-400" /> Post New Material / Assignment
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -420,7 +420,7 @@ export default function Classroom() {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4 text-xs sm:text-sm">
+            <form onSubmit={handleCreate} className="overflow-y-auto pr-1.5 space-y-4 text-xs sm:text-sm flex-1 pt-2">
               {/* Type Picker */}
               <div>
                 <label className="label">Material Category *</label>
@@ -615,7 +615,7 @@ export default function Classroom() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-3 shrink-0 border-t border-gray-800/80 mt-2">
                 <button
                   type="button"
                   className="btn-secondary flex-1"
