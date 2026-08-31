@@ -290,10 +290,10 @@ ClassVision Mobile supports two distinct institutional deployment workflows:
 
 | Role | Email | Password | Intended Workflow |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@classvision.local` *(or `admin@classvission.local`)* | `Anup1202500` | Full dashboard, student registry, system config |
+| **Admin** | `admin@classvision.local` *(or `admin@classvission.local`)* | `admin123` *(Set via `ADMIN_PASSWORD` env)* | Full dashboard, student registry, system config |
 | **Student** | `student@classvision.local` | `student123` | Mobile app 1-tap check-in, personal profile |
 
-*(In production environments, generate decoupled keys using `python backend/scripts/generate_secrets.py`.)*
+*(In production environments, override `ADMIN_PASSWORD` in your cloud/environment dashboard and generate keys using `python backend/scripts/generate_secrets.py`.)*
 
 ---
 
