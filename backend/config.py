@@ -50,6 +50,9 @@ REDIS_URL = os.getenv("REDIS_URL", "")
 # Reverse Proxy IP Header Trust (Only enable if deployed behind a verified trusted reverse proxy)
 TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").lower() in ("true", "1")
 
+# Auth Token Transmission Mode ('cookie' for secure web, 'bearer' for React Native / mobile, 'both' for hybrid)
+AUTH_MODE = os.getenv("AUTH_MODE", "cookie").lower()
+
 DEFAULT_ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 DEFAULT_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@classvision.local")
 DEFAULT_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")

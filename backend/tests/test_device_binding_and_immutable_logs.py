@@ -24,7 +24,7 @@ def test_student_first_login_binds_device(client, db_session):
     assert data["role"] == "student"
     assert data["enrollment"] == "BCA2024001"
     assert data["course"] == "BCA"
-    assert "access_token" in data
+    assert "access_token" in res.cookies
 
 
 def test_student_second_factor_pin_enforcement(client, db_session):
@@ -131,7 +131,11 @@ def test_course_restricted_material_access(client, db_session):
     db_session.commit()
 
     # 1. Login as BCA Student
-    bca_auth = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "bca_device"}).json()
+    bca_auth = client.post(
+        "/auth/student-login",
+        json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "bca_device"},
+        headers={"X-Auth-Mode": "bearer"},
+    ).json()
     bca_headers = {"Authorization": f"Bearer {bca_auth['access_token']}"}
 
     # 2. Get materials -> BCA student must only see BCA materials and All-course materials

@@ -313,6 +313,15 @@ ClassVision 2.0 uses **defense-in-depth engineering** to eliminate over 95% of r
 
 ---
 
+## 🔮 Planned & Archived Features (Research Prototypes)
+
+The active production core in `backend/` and `frontend/` focuses strictly on high-integrity biometric attendance, anti-spoof liveness, hardware binding, and geofencing. Experimental prototypes explore auxiliary capabilities:
+
+- **Emotion & Attention Tracking**: Exploratory prototypes for facial emotion classification and gaze tracking are preserved in [`archive/future/`](archive/future/). These are experimental research scripts and are intentionally decoupled from the production attendance pipeline.
+- **Hardware-Backed Device Attestation**: Future integration roadmap includes Google Play Integrity and Apple App Attest for mobile clients.
+
+---
+
 ## 📄 License & Attribution
 
 MIT License — free to use, modify, and distribute with attribution.  

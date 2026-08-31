@@ -1,7 +1,6 @@
+import config
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
-
-from config import ENVIRONMENT, TOKEN_EXPIRE_HOURS
 from database import get_db
 from middleware.jwt_middleware import (
     check_login_rate_limit,
@@ -20,7 +19,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _is_secure_cookie() -> bool:
-    return ENVIRONMENT.lower() == "production"
+    return config.ENVIRONMENT.lower() == "production"
+
+
+def _should_include_token_in_body(request: Request) -> bool:
+    """Returns True if client requested Bearer token in JSON payload (e.g. React Native mobile app)."""
+    mode_header = request.headers.get("x-auth-mode", "").lower()
+    return config.AUTH_MODE in ("bearer", "both") or mode_header == "bearer"
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -31,7 +36,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         httponly=True,
         secure=_is_secure_cookie(),
         samesite="lax",
-        max_age=int(TOKEN_EXPIRE_HOURS * 3600),
+        max_age=int(config.TOKEN_EXPIRE_HOURS * 3600),
         path="/",
     )
 
@@ -45,6 +50,9 @@ def login(request: Request, response: Response, body: LoginRequest, db: Session 
         result = auth_service.login(db, body.email, body.password)
         if "access_token" in result:
             _set_auth_cookie(response, result["access_token"])
+            if not _should_include_token_in_body(request):
+                result = dict(result)
+                result.pop("access_token", None)
         return result
     except HTTPException:
         record_failed_login(client_ip)
@@ -67,6 +75,9 @@ def student_login(request: Request, response: Response, body: StudentLoginReques
         )
         if "access_token" in result:
             _set_auth_cookie(response, result["access_token"])
+            if not _should_include_token_in_body(request):
+                result = dict(result)
+                result.pop("access_token", None)
         return result
     except HTTPException:
         record_failed_login(client_ip)
@@ -116,7 +127,10 @@ def refresh(request: Request, response: Response, current: dict = Depends(get_cu
             name=current.get("name", ""),
         )
     _set_auth_cookie(response, new_token)
-    return {"access_token": new_token, "user": current}
+    res_data = {"token_type": "bearer", "user": current}
+    if _should_include_token_in_body(request):
+        res_data["access_token"] = new_token
+    return res_data
 
 
 @router.post("/register", status_code=201)

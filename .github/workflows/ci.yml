@@ -42,7 +42,15 @@ jobs:
           ATTENDANCE_TICKET_SECRET: test_attendance_ticket_secret_min_32_chars_123456
           FACE_ENCRYPTION_KEY: E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=
         run: |
-          pytest test_priority1.py test_priority2.py tests/ -v
+          pip install pytest-cov
+          pytest --cov=. --cov-report=term-missing --cov-report=xml:coverage.xml test_priority1.py test_priority2.py tests/ -v
+
+      - name: Upload Coverage XML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage-report
+          path: backend/coverage.xml
 
       - name: Run Bandit Static Security Analysis
         working-directory: backend

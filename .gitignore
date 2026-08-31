@@ -43,3 +43,8 @@ test_classvision.db*
 
 .vscode/
 .idea/
+
+# Testing & Coverage
+.coverage
+coverage.xml
+.pytest_cache/

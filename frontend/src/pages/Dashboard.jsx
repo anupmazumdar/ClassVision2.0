@@ -13,6 +13,8 @@ import {
   KeyRound,
   MapPin,
   ShieldCheck,
+  Info,
+  X,
 } from "lucide-react";
 import { getSessions, startSession, getStudents, deleteSession, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -26,6 +28,9 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [studentCount, setStudentCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showRiskBanner, setShowRiskBanner] = useState(() => {
+    return localStorage.getItem("cv_dismiss_risk_banner") !== "true";
+  });
   const [startForm, setStartForm] = useState({
     show: false,
     subject: "",
@@ -155,6 +160,37 @@ export default function Dashboard() {
           color="amber"
         />
       </div>
+
+      {/* Security Boundaries & Known Limitations Transparency Notice */}
+      {showRiskBanner && (
+        <div className="p-3.5 bg-gray-900/90 border border-indigo-900/60 rounded-xl text-xs flex items-start justify-between gap-3 shadow-md">
+          <div className="flex items-start gap-2.5">
+            <Info size={16} className="text-indigo-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-gray-300">
+              <span className="font-semibold text-indigo-300">Security Transparency & System Boundaries:</span>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-gray-400">
+                <li>
+                  <strong className="text-gray-300">GPS Geofence:</strong> Browser coordinates can be mocked by software tools (server enforces Haversine radius math, but cannot verify OS hardware sensor integrity).
+                </li>
+                <li>
+                  <strong className="text-gray-300">Lab Hardware Binding:</strong> Cloned lab PC OS images share identical browser fingerprints (use mobile app with hardware IDs for strict 1:1 student binding).
+                </li>
+              </ul>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowRiskBanner(false);
+              localStorage.setItem("cv_dismiss_risk_banner", "true");
+            }}
+            className="text-gray-500 hover:text-gray-300 p-1 rounded transition-colors shrink-0"
+            aria-label="Dismiss security notice"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* Active session banner */}
       {activeSession && (
