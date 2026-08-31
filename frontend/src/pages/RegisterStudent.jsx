@@ -260,16 +260,25 @@ export default function RegisterStudent() {
                   id="student-course"
                   className="input bg-gray-900"
                   value={form.course}
-                  onChange={(e) => setForm({ ...form, course: e.target.value })}
+                  onChange={(e) => {
+                    const c = e.target.value;
+                    let maxYears = 4;
+                    if (["M.Tech", "MCA", "MBA"].includes(c)) maxYears = 2;
+                    else if (["BCA", "BBA", "Diploma"].includes(c)) maxYears = 3;
+
+                    const newYear = form.year > maxYears ? 1 : form.year;
+                    const newSem = (newYear * 2) - 1;
+                    setForm({ ...form, course: c, year: newYear, semester: newSem });
+                  }}
                   required
                 >
-                  <option value="B.Tech">B.Tech (Bachelor of Technology)</option>
-                  <option value="M.Tech">M.Tech (Master of Technology)</option>
-                  <option value="BCA">BCA (Computer Applications)</option>
-                  <option value="MCA">MCA (Computer Applications)</option>
-                  <option value="BBA">BBA (Business Administration)</option>
-                  <option value="MBA">MBA (Management)</option>
-                  <option value="Diploma">Diploma Engineering</option>
+                  <option value="B.Tech">B.Tech (4 Years • 8 Semesters)</option>
+                  <option value="BCA">BCA (3 Years • 6 Semesters)</option>
+                  <option value="BBA">BBA (3 Years • 6 Semesters)</option>
+                  <option value="Diploma">Diploma (3 Years • 6 Semesters)</option>
+                  <option value="MCA">MCA (2 Years • 4 Semesters)</option>
+                  <option value="MBA">MBA (2 Years • 4 Semesters)</option>
+                  <option value="M.Tech">M.Tech (2 Years • 4 Semesters)</option>
                 </select>
               </div>
 
@@ -309,10 +318,14 @@ export default function RegisterStudent() {
                   }}
                   required
                 >
-                  <option value={1}>1st Year</option>
-                  <option value={2}>2nd Year</option>
-                  <option value={3}>3rd Year</option>
-                  <option value={4}>4th Year</option>
+                  {(() => {
+                    let maxYears = 4;
+                    if (["M.Tech", "MCA", "MBA"].includes(form.course)) maxYears = 2;
+                    else if (["BCA", "BBA", "Diploma"].includes(form.course)) maxYears = 3;
+                    return Array.from({ length: maxYears }, (_, i) => i + 1).map((y) => (
+                      <option key={y} value={y}>{y}{y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year</option>
+                    ));
+                  })()}
                 </select>
               </div>
 
@@ -325,9 +338,15 @@ export default function RegisterStudent() {
                   onChange={(e) => setForm({ ...form, semester: parseInt(e.target.value) })}
                   required
                 >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                    <option key={s} value={s}>Semester {s}</option>
-                  ))}
+                  {(() => {
+                    let maxYears = 4;
+                    if (["M.Tech", "MCA", "MBA"].includes(form.course)) maxYears = 2;
+                    else if (["BCA", "BBA", "Diploma"].includes(form.course)) maxYears = 3;
+                    const maxSems = maxYears * 2;
+                    return Array.from({ length: maxSems }, (_, i) => i + 1).map((s) => (
+                      <option key={s} value={s}>Semester {s}</option>
+                    ));
+                  })()}
                 </select>
               </div>
 

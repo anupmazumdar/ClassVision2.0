@@ -13,10 +13,22 @@ import {
   Filter,
   GraduationCap,
   Sparkles,
+  X,
 } from "lucide-react";
 import { getStudents, deleteStudent, autoPromoteStudents, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+
+const COURSES_CONFIG = [
+  { id: "all", label: "All Courses", years: 4 },
+  { id: "B.Tech", label: "B.Tech (4 Yrs)", years: 4 },
+  { id: "BCA", label: "BCA (3 Yrs)", years: 3 },
+  { id: "BBA", label: "BBA (3 Yrs)", years: 3 },
+  { id: "Diploma", label: "Diploma (3 Yrs)", years: 3 },
+  { id: "MCA", label: "MCA (2 Yrs)", years: 2 },
+  { id: "MBA", label: "MBA (2 Yrs)", years: 2 },
+  { id: "M.Tech", label: "M.Tech (2 Yrs)", years: 2 },
+];
 
 export default function Students() {
   const navigate = useNavigate();
@@ -26,9 +38,9 @@ export default function Students() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
-  const [selectedCourse, setSelectedCourse] = useState("all");
   const [deleting, setDeleting] = useState(null);
   const [promoting, setPromoting] = useState(false);
 
@@ -40,8 +52,12 @@ export default function Students() {
 
   useEffect(load, []);
 
+  // Compute maximum years based on chosen course
+  const currentCourseObj = COURSES_CONFIG.find((c) => c.id === selectedCourse);
+  const maxYearsForCourse = currentCourseObj ? currentCourseObj.years : 4;
+
   const handleAutoPromote = async () => {
-    if (!confirm("Automatically recalculate academic year and semester for all students based on their admission year?")) {
+    if (!confirm("Automatically recalculate academic year and semester for all students based on their admission year and course duration?")) {
       return;
     }
     setPromoting(true);
@@ -56,22 +72,36 @@ export default function Students() {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setSelectedCourse("all");
+    setSelectedBranch("all");
+    setSelectedYear("all");
+  };
+
+  const hasActiveFilters = search || selectedCourse !== "all" || selectedBranch !== "all" || selectedYear !== "all";
+
   const filtered = students.filter((s) => {
+    const sCourse = (s.course || "B.Tech").toLowerCase();
+    const sBranch = (s.branch || s.department || "").toLowerCase();
+    const sYear = String(s.year || 1);
+
     const matchesSearch =
+      !search.trim() ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.enrollment.toLowerCase().includes(search.toLowerCase()) ||
-      (s.branch || s.department || "").toLowerCase().includes(search.toLowerCase());
-
-    const matchesBranch =
-      selectedBranch === "all" || (s.branch || s.department || "").toLowerCase().includes(selectedBranch.toLowerCase());
-
-    const matchesYear =
-      selectedYear === "all" || String(s.year || 1) === selectedYear;
+      sBranch.includes(search.toLowerCase());
 
     const matchesCourse =
-      selectedCourse === "all" || (s.course || "B.Tech").toLowerCase() === selectedCourse.toLowerCase();
+      selectedCourse === "all" || sCourse === selectedCourse.toLowerCase();
 
-    return matchesSearch && matchesBranch && matchesYear && matchesCourse;
+    const matchesBranch =
+      selectedBranch === "all" || sBranch.includes(selectedBranch.toLowerCase());
+
+    const matchesYear =
+      selectedYear === "all" || sYear === selectedYear;
+
+    return matchesSearch && matchesCourse && matchesBranch && matchesYear;
   });
 
   const handleDelete = async (id, name) => {
@@ -97,7 +127,7 @@ export default function Students() {
             <GraduationCap className="text-indigo-400" /> Students Directory
           </h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            {students.length} registered students • Academic Year auto-progression active
+            {students.length} registered students • B.Tech (4y), BCA/BBA (3y), MCA/MBA/M.Tech (2y)
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -106,7 +136,7 @@ export default function Students() {
               className="btn-secondary flex items-center gap-1.5 text-xs text-indigo-300 border-indigo-800/60 hover:bg-indigo-950/40"
               onClick={handleAutoPromote}
               disabled={promoting}
-              title="Automatically update Year/Semester based on admission year"
+              title="Automatically update Year/Semester based on admission year and course duration"
             >
               {promoting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
               <span>Auto-Update Years</span>
@@ -118,66 +148,110 @@ export default function Students() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Search */}
-        <div className="relative">
-          <label htmlFor="student-search-input" className="sr-only">Search students</label>
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-          <input
-            id="student-search-input"
-            className="input pl-9 text-xs"
-            placeholder="Search by name or enrollment…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Simplified, Easy Filter Bar */}
+      <div className="card p-3.5 bg-gray-900/90 border-gray-800 space-y-3 shadow-md">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Search Input */}
+          <div className="relative">
+            <label htmlFor="student-search-input" className="sr-only">Search by name or roll number</label>
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            <input
+              id="student-search-input"
+              className="input pl-8.5 pr-8 text-xs bg-gray-950"
+              placeholder="Search student name or roll…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Course Selector */}
+          <div>
+            <select
+              className="input bg-gray-950 text-xs font-medium"
+              value={selectedCourse}
+              onChange={(e) => {
+                const c = e.target.value;
+                setSelectedCourse(c);
+                const cObj = COURSES_CONFIG.find((x) => x.id === c);
+                const max = cObj ? cObj.years : 4;
+                if (selectedYear !== "all" && parseInt(selectedYear) > max) {
+                  setSelectedYear("all");
+                }
+              }}
+            >
+              {COURSES_CONFIG.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Branch Selector */}
+          <div>
+            <select
+              className="input bg-gray-950 text-xs"
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+            >
+              <option value="all">All Branches</option>
+              <option value="Computer Science">CSE (All specializations)</option>
+              <option value="AI">CSE (AI & ML)</option>
+              <option value="Data Science">CSE (Data Science)</option>
+              <option value="Information Technology">Information Technology (IT)</option>
+              <option value="Electronics">Electronics (ECE)</option>
+              <option value="Electrical">Electrical (EE)</option>
+              <option value="Mechanical">Mechanical (ME)</option>
+              <option value="Civil">Civil (CE)</option>
+              <option value="Biotechnology">Biotechnology</option>
+            </select>
+          </div>
+
+          {/* Adaptive Year Selector */}
+          <div className="flex items-center gap-2">
+            <select
+              className="input bg-gray-950 text-xs flex-1"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            >
+              <option value="all">All Academic Years</option>
+              {Array.from({ length: maxYearsForCourse }, (_, i) => i + 1).map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}{y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year (Sem {(y * 2) - 1}-{y * 2})
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={handleResetFilters}
+                className="btn-secondary text-xs px-2.5 py-2 text-gray-400 hover:text-red-400 border-gray-700 hover:border-red-800/80 shrink-0"
+                title="Reset all search filters"
+              >
+                <X size={14} className="inline mr-1" /> Clear
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Course Filter */}
-        <select
-          className="input bg-gray-900 text-xs"
-          value={selectedCourse}
-          onChange={(e) => setSelectedCourse(e.target.value)}
-        >
-          <option value="all">All Courses</option>
-          <option value="B.Tech">B.Tech</option>
-          <option value="M.Tech">M.Tech</option>
-          <option value="BCA">BCA</option>
-          <option value="MCA">MCA</option>
-          <option value="BBA">BBA</option>
-          <option value="MBA">MBA</option>
-          <option value="Diploma">Diploma</option>
-        </select>
-
-        {/* Branch Filter */}
-        <select
-          className="input bg-gray-900 text-xs"
-          value={selectedBranch}
-          onChange={(e) => setSelectedBranch(e.target.value)}
-        >
-          <option value="all">All Branches</option>
-          <option value="Computer Science">CSE / CS</option>
-          <option value="AI">AI & Machine Learning</option>
-          <option value="Data Science">Data Science</option>
-          <option value="Information Technology">IT</option>
-          <option value="Electronics">ECE</option>
-          <option value="Electrical">EE</option>
-          <option value="Mechanical">ME</option>
-          <option value="Civil">CE</option>
-        </select>
-
-        {/* Year Filter */}
-        <select
-          className="input bg-gray-900 text-xs"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-        >
-          <option value="all">All Academic Years</option>
-          <option value="1">1st Year (Sem 1-2)</option>
-          <option value="2">2nd Year (Sem 3-4)</option>
-          <option value="3">3rd Year (Sem 5-6)</option>
-          <option value="4">4th Year (Sem 7-8)</option>
-        </select>
+        {/* Filter Stats Badge Bar */}
+        <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5 border-t border-gray-800/60">
+          <span>
+            Showing <strong className="text-indigo-400">{filtered.length}</strong> of <strong>{students.length}</strong> students
+          </span>
+          {hasActiveFilters && (
+            <span className="text-gray-500 italic">
+              Filters active ({selectedCourse !== "all" ? selectedCourse : "All"} • {selectedBranch !== "all" ? selectedBranch : "All"} • {selectedYear !== "all" ? `Yr ${selectedYear}` : "All Yrs"})
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -186,10 +260,20 @@ export default function Students() {
           <Loader2 size={28} className="animate-spin text-indigo-500" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="card text-center py-14 text-gray-500 text-sm">
-          {search || selectedBranch !== "all" || selectedYear !== "all"
-            ? "No students match your filter criteria."
-            : "No students registered yet."}
+        <div className="card text-center py-14 text-gray-500 text-sm space-y-2">
+          <p>
+            {hasActiveFilters
+              ? "No students match your filter criteria."
+              : "No students registered yet."}
+          </p>
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="btn-secondary text-xs mt-2 text-indigo-400 border-indigo-800"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900/60 shadow-xl">

@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import { getMaterials, createMaterial, deleteMaterial, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +36,17 @@ const TYPE_CONFIG = {
   announcement: { label: "Announcements", icon: Megaphone, color: "text-rose-400", bg: "bg-rose-950/60 border-rose-800" },
 };
 
+const COURSES_CONFIG = [
+  { id: "all", label: "All Courses", years: 4 },
+  { id: "B.Tech", label: "B.Tech (4 Yrs)", years: 4 },
+  { id: "BCA", label: "BCA (3 Yrs)", years: 3 },
+  { id: "BBA", label: "BBA (3 Yrs)", years: 3 },
+  { id: "Diploma", label: "Diploma (3 Yrs)", years: 3 },
+  { id: "MCA", label: "MCA (2 Yrs)", years: 2 },
+  { id: "MBA", label: "MBA (2 Yrs)", years: 2 },
+  { id: "M.Tech", label: "M.Tech (2 Yrs)", years: 2 },
+];
+
 export default function Classroom() {
   const { user } = useAuth();
   const toast = useToast();
@@ -45,9 +57,9 @@ export default function Classroom() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  const [filterCourse, setFilterCourse] = useState("all");
   const [filterBranch, setFilterBranch] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
-  const [filterCourse, setFilterCourse] = useState("all");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -72,11 +84,15 @@ export default function Classroom() {
     setLoading(true);
     getMaterials()
       .then(setMaterials)
-      .catch((err) => toast.error(getErrorMessage(err, "Failed to load classroom materials.")))
+      .catch((err) => toast.error(getErrorMessage(err, "Failed to load materials.")))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
+
+  // Compute maximum years based on chosen course filter
+  const currentCourseObj = COURSES_CONFIG.find((c) => c.id === filterCourse);
+  const maxFilterYears = currentCourseObj ? currentCourseObj.years : 4;
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -146,12 +162,25 @@ export default function Classroom() {
     shareToWhatsApp(text);
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setFilterCourse("all");
+    setFilterBranch("all");
+    setFilterYear("all");
+  };
+
+  const hasActiveFilters = search || filterCourse !== "all" || filterBranch !== "all" || filterYear !== "all";
+
   const filteredMaterials = materials.filter((m) => {
     const matchesTab = activeTab === "all" || m.material_type === activeTab;
     const matchesSearch =
+      !search.trim() ||
       m.title.toLowerCase().includes(search.toLowerCase()) ||
       m.subject.toLowerCase().includes(search.toLowerCase()) ||
       (m.description || "").toLowerCase().includes(search.toLowerCase());
+
+    const matchesCourse =
+      filterCourse === "all" || m.course === "All" || m.course.toLowerCase() === filterCourse.toLowerCase();
 
     const matchesBranch =
       filterBranch === "all" || m.branch === "All" || m.branch.toLowerCase().includes(filterBranch.toLowerCase());
@@ -159,10 +188,7 @@ export default function Classroom() {
     const matchesYear =
       filterYear === "all" || m.year === "All" || m.year.toLowerCase().includes(filterYear.toLowerCase());
 
-    const matchesCourse =
-      filterCourse === "all" || m.course === "All" || m.course.toLowerCase() === filterCourse.toLowerCase();
-
-    return matchesTab && matchesSearch && matchesBranch && matchesYear && matchesCourse;
+    return matchesTab && matchesSearch && matchesCourse && matchesBranch && matchesYear;
   });
 
   return (
@@ -188,7 +214,7 @@ export default function Classroom() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Category Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs sm:text-sm border-b border-gray-800">
         {Object.entries(TYPE_CONFIG).map(([key, config]) => {
           const Icon = config.icon;
@@ -216,60 +242,110 @@ export default function Classroom() {
         })}
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="relative">
-          <label htmlFor="material-search" className="sr-only">Search materials</label>
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-          <input
-            id="material-search"
-            className="input pl-9 text-xs"
-            placeholder="Search notes, tests, assignments…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Simplified Filter Bar */}
+      <div className="card p-3.5 bg-gray-900/90 border-gray-800 space-y-3 shadow-md">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Search */}
+          <div className="relative">
+            <label htmlFor="material-search" className="sr-only">Search materials</label>
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            <input
+              id="material-search"
+              className="input pl-8.5 pr-8 text-xs bg-gray-950"
+              placeholder="Search notes, tests, assignments…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Course */}
+          <div>
+            <select
+              className="input bg-gray-950 text-xs font-medium"
+              value={filterCourse}
+              onChange={(e) => {
+                const c = e.target.value;
+                setFilterCourse(c);
+                const cObj = COURSES_CONFIG.find((x) => x.id === c);
+                const max = cObj ? cObj.years : 4;
+                if (filterYear !== "all" && parseInt(filterYear) > max) {
+                  setFilterYear("all");
+                }
+              }}
+            >
+              {COURSES_CONFIG.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Branch */}
+          <div>
+            <select
+              className="input bg-gray-950 text-xs"
+              value={filterBranch}
+              onChange={(e) => setFilterBranch(e.target.value)}
+            >
+              <option value="all">All Branches</option>
+              <option value="Computer Science">CSE (All branches)</option>
+              <option value="AI">CSE (AI & ML)</option>
+              <option value="Data Science">CSE (Data Science)</option>
+              <option value="Information Technology">IT</option>
+              <option value="Electronics">ECE</option>
+              <option value="Electrical">EE</option>
+              <option value="Mechanical">ME</option>
+              <option value="Civil">CE</option>
+              <option value="Biotechnology">Biotechnology</option>
+            </select>
+          </div>
+
+          {/* Adaptive Year */}
+          <div className="flex items-center gap-2">
+            <select
+              className="input bg-gray-950 text-xs flex-1"
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+            >
+              <option value="all">All Academic Years</option>
+              {Array.from({ length: maxFilterYears }, (_, i) => i + 1).map((y) => (
+                <option key={y} value={`${y}${y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year`}>
+                  {y}{y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={handleResetFilters}
+                className="btn-secondary text-xs px-2.5 py-2 text-gray-400 hover:text-red-400 border-gray-700 hover:border-red-800/80 shrink-0"
+                title="Reset filters"
+              >
+                <X size={14} className="inline mr-1" /> Clear
+              </button>
+            )}
+          </div>
         </div>
 
-        <select
-          className="input bg-gray-900 text-xs"
-          value={filterCourse}
-          onChange={(e) => setFilterCourse(e.target.value)}
-        >
-          <option value="all">All Courses (B.Tech, BCA, MCA…)</option>
-          <option value="B.Tech">B.Tech</option>
-          <option value="M.Tech">M.Tech</option>
-          <option value="BCA">BCA</option>
-          <option value="MCA">MCA</option>
-          <option value="BBA">BBA</option>
-          <option value="MBA">MBA</option>
-        </select>
-
-        <select
-          className="input bg-gray-900 text-xs"
-          value={filterBranch}
-          onChange={(e) => setFilterBranch(e.target.value)}
-        >
-          <option value="all">All Branches (CSE, ECE, IT…)</option>
-          <option value="Computer Science">Computer Science (CSE)</option>
-          <option value="AI">AI & Machine Learning</option>
-          <option value="Data Science">Data Science</option>
-          <option value="Information Technology">Information Technology</option>
-          <option value="Electronics">Electronics (ECE)</option>
-          <option value="Mechanical">Mechanical (ME)</option>
-          <option value="Civil">Civil (CE)</option>
-        </select>
-
-        <select
-          className="input bg-gray-900 text-xs"
-          value={filterYear}
-          onChange={(e) => setFilterYear(e.target.value)}
-        >
-          <option value="all">All Academic Years</option>
-          <option value="1st Year">1st Year</option>
-          <option value="2nd Year">2nd Year</option>
-          <option value="3rd Year">3rd Year</option>
-          <option value="4th Year">4th Year</option>
-        </select>
+        {/* Filter info */}
+        <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5 border-t border-gray-800/60">
+          <span>
+            Showing <strong className="text-indigo-400">{filteredMaterials.length}</strong> of <strong>{materials.length}</strong> items
+          </span>
+          {hasActiveFilters && (
+            <span className="text-gray-500 italic">
+              Filtered ({filterCourse !== "all" ? filterCourse : "All"} • {filterBranch !== "all" ? filterBranch : "All"} • {filterYear !== "all" ? filterYear : "All Yrs"})
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Materials Feed */}
@@ -282,8 +358,14 @@ export default function Classroom() {
           <div className="w-12 h-12 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto text-gray-600">
             <BookOpen size={24} />
           </div>
-          <p className="text-sm">No classroom materials or assignments found.</p>
-          {isTeacherOrAdmin && (
+          <p className="text-sm">
+            {hasActiveFilters ? "No materials match your filter criteria." : "No study materials or assignments found."}
+          </p>
+          {hasActiveFilters ? (
+            <button className="btn-secondary text-xs text-indigo-400 border-indigo-800" onClick={handleResetFilters}>
+              Reset Filters
+            </button>
+          ) : isTeacherOrAdmin && (
             <button className="btn-secondary text-xs" onClick={() => setModalOpen(true)}>
               + Post First Material
             </button>
@@ -365,7 +447,7 @@ export default function Classroom() {
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1 bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
-                      {m.branch || "All Branches"} • {m.year || "All Years"}
+                      {m.course || "All Courses"} • {m.branch || "All Branches"} • {m.year || "All Years"}
                     </span>
                   </div>
                 </div>
@@ -455,7 +537,7 @@ export default function Classroom() {
                   <label htmlFor="mat-title" className="label">Material / Assignment Title *</label>
                   <input
                     id="mat-title"
-                    className="input"
+                    className="input bg-gray-950"
                     placeholder="e.g. Unit 3 - Tree Traversals Notes"
                     value={form.title}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -466,7 +548,7 @@ export default function Classroom() {
                   <label htmlFor="mat-subject" className="label">Subject *</label>
                   <input
                     id="mat-subject"
-                    className="input"
+                    className="input bg-gray-950"
                     placeholder="e.g. Data Structures & Algorithms"
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
@@ -483,15 +565,22 @@ export default function Classroom() {
                     id="mat-course"
                     className="input bg-gray-950 text-xs"
                     value={form.course}
-                    onChange={(e) => setForm({ ...form, course: e.target.value })}
+                    onChange={(e) => {
+                      const c = e.target.value;
+                      let max = 4;
+                      if (["M.Tech", "MCA", "MBA"].includes(c)) max = 2;
+                      else if (["BCA", "BBA", "Diploma"].includes(c)) max = 3;
+                      setForm({ ...form, course: c, year: "All" });
+                    }}
                   >
                     <option value="All">All Courses</option>
-                    <option value="B.Tech">B.Tech</option>
-                    <option value="M.Tech">M.Tech</option>
-                    <option value="BCA">BCA</option>
-                    <option value="MCA">MCA</option>
-                    <option value="BBA">BBA</option>
-                    <option value="MBA">MBA</option>
+                    <option value="B.Tech">B.Tech (4 Years)</option>
+                    <option value="BCA">BCA (3 Years)</option>
+                    <option value="BBA">BBA (3 Years)</option>
+                    <option value="Diploma">Diploma (3 Years)</option>
+                    <option value="MCA">MCA (2 Years)</option>
+                    <option value="MBA">MBA (2 Years)</option>
+                    <option value="M.Tech">M.Tech (2 Years)</option>
                   </select>
                 </div>
                 <div>
@@ -505,14 +594,17 @@ export default function Classroom() {
                     <option value="All">All Branches</option>
                     <option value="Computer Science & Engineering (CSE)">CSE</option>
                     <option value="CSE (AI & Machine Learning)">CSE (AI/ML)</option>
+                    <option value="CSE (Data Science)">CSE (Data Science)</option>
                     <option value="Information Technology (IT)">IT</option>
                     <option value="Electronics & Communication (ECE)">ECE</option>
+                    <option value="Electrical Engineering (EE)">EE</option>
                     <option value="Mechanical Engineering (ME)">ME</option>
                     <option value="Civil Engineering (CE)">CE</option>
+                    <option value="Biotechnology">Biotechnology</option>
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="mat-year" className="label">Academic Year</label>
+                  <label htmlFor="mat-year" className="label">Academic Year Target</label>
                   <select
                     id="mat-year"
                     className="input bg-gray-950 text-xs"
@@ -520,10 +612,16 @@ export default function Classroom() {
                     onChange={(e) => setForm({ ...form, year: e.target.value })}
                   >
                     <option value="All">All Years</option>
-                    <option value="1st Year">1st Year</option>
-                    <option value="2nd Year">2nd Year</option>
-                    <option value="3rd Year">3rd Year</option>
-                    <option value="4th Year">4th Year</option>
+                    {(() => {
+                      let max = 4;
+                      if (["M.Tech", "MCA", "MBA"].includes(form.course)) max = 2;
+                      else if (["BCA", "BBA", "Diploma"].includes(form.course)) max = 3;
+                      return Array.from({ length: max }, (_, i) => i + 1).map((y) => (
+                        <option key={y} value={`${y}${y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year`}>
+                          {y}{y === 1 ? "st" : y === 2 ? "nd" : y === 3 ? "rd" : "th"} Year
+                        </option>
+                      ));
+                    })()}
                   </select>
                 </div>
               </div>
@@ -534,7 +632,7 @@ export default function Classroom() {
                 <textarea
                   id="mat-desc"
                   rows={3}
-                  className="input font-sans text-xs sm:text-sm"
+                  className="input bg-gray-950 font-sans text-xs sm:text-sm"
                   placeholder="Enter details, syllabus guidelines, homework instructions, or reading material overview…"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -548,7 +646,7 @@ export default function Classroom() {
                   <input
                     id="mat-url"
                     type="url"
-                    className="input font-mono text-xs"
+                    className="input bg-gray-950 font-mono text-xs"
                     placeholder="https://drive.google.com/file/... or PDF URL"
                     value={form.attachment_url}
                     onChange={(e) => setForm({ ...form, attachment_url: e.target.value })}
@@ -558,7 +656,7 @@ export default function Classroom() {
                   <label htmlFor="mat-filename" className="label">File Display Name</label>
                   <input
                     id="mat-filename"
-                    className="input text-xs"
+                    className="input bg-gray-950 text-xs"
                     placeholder="e.g. Trees_Handout_Unit3.pdf"
                     value={form.attachment_name}
                     onChange={(e) => setForm({ ...form, attachment_name: e.target.value })}
@@ -576,7 +674,7 @@ export default function Classroom() {
                     <input
                       id="mat-due"
                       type="datetime-local"
-                      className="input text-xs"
+                      className="input bg-gray-900 text-xs"
                       value={form.due_date}
                       onChange={(e) => setForm({ ...form, due_date: e.target.value })}
                     />
@@ -587,7 +685,7 @@ export default function Classroom() {
                       id="mat-marks"
                       type="number"
                       min={0}
-                      className="input text-xs"
+                      className="input bg-gray-900 text-xs"
                       placeholder="e.g. 20 or 100"
                       value={form.total_marks}
                       onChange={(e) => setForm({ ...form, total_marks: e.target.value })}
@@ -607,7 +705,7 @@ export default function Classroom() {
                 <input
                   id="mat-wa"
                   type="url"
-                  className="input font-mono text-xs"
+                  className="input bg-gray-950 font-mono text-xs"
                   placeholder="https://chat.whatsapp.com/..."
                   value={form.whatsapp_group_link}
                   onChange={(e) => setForm({ ...form, whatsapp_group_link: e.target.value })}
