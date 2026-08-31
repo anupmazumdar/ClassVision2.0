@@ -71,6 +71,8 @@ def init_db():
                         conn.exec_driver_sql("ALTER TABLE students ADD COLUMN device_bound_at DATETIME")
                     if "last_login_at" not in existing_cols:
                         conn.exec_driver_sql("ALTER TABLE students ADD COLUMN last_login_at DATETIME")
+                    if "pin_hash" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN pin_hash VARCHAR")
     except Exception:
         pass
 

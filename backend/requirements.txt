@@ -1,27 +1,38 @@
-# ClassVision Backend Dependencies
-# Note: Pin bcrypt<4.1 to avoid passlib bcrypt backend incompatibility
+# ==============================================================================
+# ClassVision 2.0 Production Backend Dependencies (Pinned Exact Versions)
+# ==============================================================================
+
+# Authentication & Cryptography
 bcrypt==4.0.1
 passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.5.0
+cryptography==50.0.0
 
-fastapi>=0.104.1
-uvicorn[standard]>=0.24.0
-python-jose[cryptography]>=3.3.0
-python-multipart>=0.0.6
-sqlalchemy>=2.0.23
-alembic>=1.13.0
-Pillow>=10.0.0
-numpy>=1.24.0
-openpyxl>=3.1.2
-python-dotenv>=1.0.0
-cryptography>=41.0.0
-email-validator>=2.0.0
-opencv-python>=4.8.0.76,<5.0.0
+# Web Framework & ASGI Server
+fastapi==0.129.0
+uvicorn[standard]==0.40.0
+python-multipart==0.0.22
+email-validator==2.3.0
 
-fpdf2>=2.7.9
+# Database ORM & Migrations
+SQLAlchemy==2.0.46
+alembic==1.19.1
 
-# Testing & HTTP Test Client
-pytest>=7.4.0
-httpx>=0.25.0
+# Biometrics & Image Processing
+numpy==2.4.2
+Pillow==12.1.1
+opencv-python-headless==4.13.0.92
 
-# Production Cache & Distributed Rate Limiting
-redis>=5.0.0
+# Reports & File Generation
+openpyxl==3.1.5
+fpdf2==2.8.7
+
+# Environment & Configuration
+python-dotenv==1.2.1
+
+# Distributed Caching & Rate Limiting
+redis==8.1.0
+
+# Testing & Client Tooling
+pytest==9.1.1
+httpx==0.28.1

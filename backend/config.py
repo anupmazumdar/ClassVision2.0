@@ -31,6 +31,8 @@ FACE_SIMILARITY_THRESHOLD = float(os.getenv("FACE_SIMILARITY", "0.78"))
 MAX_IMAGE_BASE64_CHARS = int(os.getenv("MAX_IMAGE_BASE64_CHARS", "7000000"))
 
 TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
+CODE_EXPIRATION_SECONDS = int(os.getenv("CODE_EXPIRATION_SECONDS", "30"))
+TICKET_EXPIRATION_SECONDS = int(os.getenv("TICKET_EXPIRATION_SECONDS", "15"))
 JWT_ALGORITHM = "HS256"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
@@ -43,6 +45,20 @@ REDIS_URL = os.getenv("REDIS_URL", "")
 DEFAULT_ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 DEFAULT_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@classvision.local")
 DEFAULT_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_ALIAS_EMAIL = os.getenv("ADMIN_ALIAS_EMAIL", "")
+
+# CORS Origin Allow-list
+CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "")
+ALLOWED_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip() and o.strip() != "*"]
+if not ALLOWED_ORIGINS and ENVIRONMENT.lower() != "production":
+    ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
 
 def check_security_config():
@@ -73,6 +89,11 @@ def check_security_config():
             raise RuntimeError("CRITICAL SECURITY ERROR: Default SESSION_CODE_SECRET detected in production environment!")
         if "cv-attendance-ticket" in ATTENDANCE_TICKET_SECRET:
             raise RuntimeError("CRITICAL SECURITY ERROR: Default ATTENDANCE_TICKET_SECRET detected in production environment!")
+        if not ALLOWED_ORIGINS:
+            raise RuntimeError(
+                "CRITICAL SECURITY ERROR: CORS_ORIGINS environment variable is empty in production! "
+                "Specify explicit allowed domain origins (e.g. CORS_ORIGINS=https://classvission.anupmazumdar.me)."
+            )
     else:
         if "change-this" in JWT_SECRET:
             logging.warning("[SECURITY WARNING] Running with default development JWT_SECRET. Set JWT_SECRET in .env for production.")

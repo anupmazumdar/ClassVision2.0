@@ -17,7 +17,7 @@ def test_student_first_login_binds_device(client, db_session):
 
     res = client.post(
         "/auth/student-login",
-        json={"enrollment": "BCA2024001", "device_id": "device_pixel_7", "device_info": "Pixel 7 Chrome"},
+        json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "device_pixel_7", "device_info": "Pixel 7 Chrome"},
     )
     assert res.status_code == 200
     data = res.json()
@@ -25,6 +25,20 @@ def test_student_first_login_binds_device(client, db_session):
     assert data["enrollment"] == "BCA2024001"
     assert data["course"] == "BCA"
     assert "access_token" in data
+
+
+def test_student_second_factor_pin_enforcement(client, db_session):
+    student = Student(name="Sunil Das", enrollment="BCA2024099", course="BCA", status="active")
+    db_session.add(student)
+    db_session.commit()
+
+    # 1. Login without PIN or with wrong PIN fails 401/422
+    res_no_pin = client.post("/auth/student-login", json={"enrollment": "BCA2024099", "device_id": "phone_test"})
+    assert res_no_pin.status_code == 422  # validation error
+
+    res_wrong_pin = client.post("/auth/student-login", json={"enrollment": "BCA2024099", "pin": "9999", "device_id": "phone_test"})
+    assert res_wrong_pin.status_code == 401
+    assert "Invalid enrollment number or PIN" in res_wrong_pin.json()["detail"]
 
 
 def test_multi_student_same_device_blocked(client, db_session):
@@ -37,14 +51,14 @@ def test_multi_student_same_device_blocked(client, db_session):
     # 1. First student logs in on phone
     res1 = client.post(
         "/auth/student-login",
-        json={"enrollment": "BCA2024001", "device_id": "shared_phone_123"},
+        json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "shared_phone_123"},
     )
     assert res1.status_code == 200
 
     # 2. Second student attempts login from the SAME phone
     res2 = client.post(
         "/auth/student-login",
-        json={"enrollment": "BT2024002", "device_id": "shared_phone_123"},
+        json={"enrollment": "BT2024002", "pin": "1234", "device_id": "shared_phone_123"},
     )
     # Must be 403 Forbidden because device is bound to BCA2024001
     assert res2.status_code == 403
@@ -58,10 +72,10 @@ def test_admin_approves_device_switch(client, db_session, admin_headers):
     db_session.commit()
 
     # 1. Bind BCA student to phone 1
-    client.post("/auth/student-login", json={"enrollment": "BCA2024001", "device_id": "phone_1"})
+    client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "phone_1"})
 
     # 2. BCA student attempts login from phone 2 (triggers approval request)
-    res_switch = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "device_id": "phone_2"})
+    res_switch = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "phone_2"})
     assert res_switch.status_code == 403
 
     # 3. Admin checks device requests
@@ -76,7 +90,7 @@ def test_admin_approves_device_switch(client, db_session, admin_headers):
     assert approve_res.status_code == 200
 
     # 5. Student can now log in on phone 2!
-    res_login2 = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "device_id": "phone_2"})
+    res_login2 = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "phone_2"})
     assert res_login2.status_code == 200
 
 
@@ -117,7 +131,7 @@ def test_course_restricted_material_access(client, db_session):
     db_session.commit()
 
     # 1. Login as BCA Student
-    bca_auth = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "device_id": "bca_device"}).json()
+    bca_auth = client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "bca_device"}).json()
     bca_headers = {"Authorization": f"Bearer {bca_auth['access_token']}"}
 
     # 2. Get materials -> BCA student must only see BCA materials and All-course materials
@@ -137,7 +151,7 @@ def test_immutable_audit_logs_recorded(client, db_session, admin_headers):
     db_session.add(student)
     db_session.commit()
 
-    client.post("/auth/student-login", json={"enrollment": "BCA2024001", "device_id": "audit_dev_1"})
+    client.post("/auth/student-login", json={"enrollment": "BCA2024001", "pin": "1234", "device_id": "audit_dev_1"})
 
     # Admin checks audit logs
     audit_res = client.get("/audit-logs", headers=admin_headers)
@@ -150,3 +164,4 @@ def test_immutable_audit_logs_recorded(client, db_session, admin_headers):
     for l in data["logs"]:
         assert "log_hash" in l
         assert len(l["log_hash"]) == 64
+

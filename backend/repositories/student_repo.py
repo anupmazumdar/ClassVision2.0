@@ -1,6 +1,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from auth import hash_password
 from models import AttendanceRecord, Student
 from utils.time import utc_now
 
@@ -28,6 +29,7 @@ def create_student(
     year: int = 1,
     semester: int = 1,
     admission_year: int = 2026,
+    pin: Optional[str] = "1234",
     device_id: Optional[str] = None,
 ):
     resolved_branch = branch if branch is not None else department
@@ -41,6 +43,7 @@ def create_student(
         semester=semester or 1,
         admission_year=admission_year or 2026,
         status="active",
+        pin_hash=hash_password(pin or "1234"),
         device_id=device_id,
     )
     db.add(student)

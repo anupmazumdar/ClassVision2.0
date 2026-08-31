@@ -13,6 +13,7 @@ class StudentCreate(BaseModel):
     year: Optional[int] = Field(default=1, ge=1, le=5)
     semester: Optional[int] = Field(default=1, ge=1, le=10)
     admission_year: Optional[int] = Field(default=2026, ge=2000, le=2100)
+    pin: Optional[str] = Field(default="1234", min_length=4, max_length=6, description="Student 4-6 digit login PIN")
 
 
 class StudentResponse(BaseModel):

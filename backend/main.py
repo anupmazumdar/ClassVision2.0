@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import (
+    ADMIN_ALIAS_EMAIL,
+    ALLOWED_ORIGINS,
     DEFAULT_ADMIN_EMAIL,
     DEFAULT_ADMIN_NAME,
     DEFAULT_ADMIN_PASSWORD,
@@ -41,6 +43,7 @@ async def lifespan(app: FastAPI):
             name=DEFAULT_ADMIN_NAME,
             email=DEFAULT_ADMIN_EMAIL,
             password=DEFAULT_ADMIN_PASSWORD,
+            alias_email=ADMIN_ALIAS_EMAIL,
         )
     finally:
         db.close()
@@ -49,14 +52,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ClassVision API", version="2.0.0", lifespan=lifespan)
 
-# CORS configuration supporting custom domains, Vercel deployments, and localhost
-cors_env = os.getenv("CORS_ORIGINS", "")
-explicit_origins = [o.strip() for o in cors_env.split(",") if o.strip() and o.strip() != "*"]
-
+# Environment-driven explicit CORS origin configuration with credential support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=explicit_origins if explicit_origins else ["*"] if ENVIRONMENT.lower() != "production" else [],
-    allow_origin_regex=r"https?://.*",
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

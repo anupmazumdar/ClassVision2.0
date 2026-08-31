@@ -26,17 +26,19 @@ def login(db: Session, email: str, password: str) -> dict:
 def student_login(
     db: Session,
     enrollment: str,
+    pin: str,
     device_id: str,
     device_info: Optional[str] = None,
     client_ip: Optional[str] = None,
 ) -> dict:
     """
-    Authenticates a registered student with strict single-device hardware binding.
-    Prevents proxy logins and enforces approval for device switching.
+    Authenticates a registered student with mandatory second factor (PIN) and single-device binding.
     """
     clean_enrollment = enrollment.strip().upper() if enrollment else ""
     if not clean_enrollment:
         raise HTTPException(status_code=400, detail="Enrollment number is required")
+    if not pin or not pin.strip():
+        raise HTTPException(status_code=400, detail="Second-factor PIN is required for student login")
     if not device_id:
         raise HTTPException(status_code=400, detail="Device identifier is required for biometric/anti-proxy binding")
 
@@ -52,6 +54,28 @@ def student_login(
             details={"reason": "Enrollment not found in university roster"},
         )
         raise HTTPException(status_code=404, detail="Student enrollment not registered. Please contact your instructor.")
+
+    clean_pin = pin.strip()
+    pin_valid = False
+    if student.pin_hash:
+        pin_valid = verify_password(clean_pin, student.pin_hash)
+    else:
+        pin_valid = (clean_pin == "1234")
+        if pin_valid:
+            student.pin_hash = hash_password(clean_pin)
+            db.commit()
+
+    if not pin_valid:
+        audit_service.record_audit_event(
+            db=db,
+            event_type="STUDENT_LOGIN_PIN_FAILED",
+            actor_type="student",
+            actor_id=student.enrollment,
+            ip_address=client_ip,
+            device_id=device_id,
+            details={"reason": "Invalid security PIN"},
+        )
+        raise HTTPException(status_code=401, detail="Invalid enrollment number or PIN")
 
     if student.status != "active":
         raise HTTPException(status_code=403, detail=f"Student account is currently {student.status}.")
@@ -165,7 +189,14 @@ def register(db: Session, name: str, email: str, password: str, role: str) -> di
     return {"id": user.id, "name": user.name, "email": user.email, "role": user.role}
 
 
-def seed_default_admin(db: Session, *, name: str, email: str, password: str) -> None:
+def seed_default_admin(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    password: str,
+    alias_email: Optional[str] = None,
+) -> None:
     cleaned_email = email.strip().lower()
     admin = user_repo.get_user_by_email(db, cleaned_email)
     if not admin:
@@ -177,14 +208,15 @@ def seed_default_admin(db: Session, *, name: str, email: str, password: str) -> 
             role="admin",
         )
 
-    # Also seed alias with double-s 'classvission' so custom domain typos don't fail
-    alt_email = "admin@classvission.local"
-    if cleaned_email != alt_email and not user_repo.get_user_by_email(db, alt_email):
-        user_repo.create_user(
-            db,
-            name=name,
-            email=alt_email,
-            password_hash=hash_password(password),
-            role="admin",
-        )
+    # Only seed alias if explicitly configured via optional environment opt-in
+    if alias_email and alias_email.strip():
+        cleaned_alias = alias_email.strip().lower()
+        if cleaned_email != cleaned_alias and not user_repo.get_user_by_email(db, cleaned_alias):
+            user_repo.create_user(
+                db,
+                name=name,
+                email=cleaned_alias,
+                password_hash=hash_password(password),
+                role="admin",
+            )
 

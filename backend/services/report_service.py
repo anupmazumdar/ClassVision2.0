@@ -43,6 +43,20 @@ def _get_session_with_records(db: Session, session_id: int):
     return session, records
 
 
+import re
+
+def _sanitize_header_value(val: str) -> str:
+    """Sanitizes text strings for safe usage in HTTP headers to prevent header injection / response splitting."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", str(val).strip())[:60]
+
+
+def _sanitize_excel_cell(val):
+    """Prevents CSV / Excel Formula Injection (CWE-1236) by quoting leading formula trigger characters."""
+    if isinstance(val, str) and val.startswith(("=", "+", "-", "@")):
+        return f"'{val}"
+    return val
+
+
 def export_pdf(db: Session, session_id: int):
     try:
         from fpdf import FPDF
@@ -113,7 +127,8 @@ def export_pdf(db: Session, session_id: int):
         pdf.ln()
 
     buf = io.BytesIO(pdf.output())
-    filename = f"attendance_{session.subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.pdf"
+    safe_subject = _sanitize_header_value(session.subject)
+    filename = f"attendance_{safe_subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.pdf"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
@@ -148,9 +163,9 @@ def export_excel(db: Session, session_id: int):
         ws.append(
             [
                 i,
-                student.enrollment,
-                student.name,
-                student.department,
+                _sanitize_excel_cell(student.enrollment),
+                _sanitize_excel_cell(student.name),
+                _sanitize_excel_cell(student.department or ""),
                 round(record.confidence, 1),
                 record.marked_at.strftime("%Y-%m-%d %H:%M:%S"),
             ]
@@ -158,8 +173,8 @@ def export_excel(db: Session, session_id: int):
 
     ws2 = wb.create_sheet("Summary")
     total_students = student_repo.count_students(db)
-    ws2.append(["Subject", session.subject])
-    ws2.append(["Room", session.room])
+    ws2.append(["Subject", _sanitize_excel_cell(session.subject)])
+    ws2.append(["Room", _sanitize_excel_cell(session.room or "")])
     ws2.append(["Date", session.started_at.strftime("%Y-%m-%d")])
     ws2.append(["Start Time", session.started_at.strftime("%H:%M:%S")])
     ws2.append(["End Time", session.ended_at.strftime("%H:%M:%S") if session.ended_at else "-"])
@@ -172,7 +187,8 @@ def export_excel(db: Session, session_id: int):
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"attendance_{session.subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.xlsx"
+    safe_subject = _sanitize_header_value(session.subject)
+    filename = f"attendance_{safe_subject}_{session.started_at.strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

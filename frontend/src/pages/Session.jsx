@@ -372,15 +372,22 @@ export default function Session() {
 
           {/* Rotating Session Code Badge */}
           {session.is_active && (
-            <div className="flex items-center gap-2 bg-indigo-950/80 border border-indigo-700/70 rounded-xl px-3 py-1.5 text-indigo-200 shadow-inner">
-              <KeyRound size={15} className="text-indigo-400 animate-pulse" />
-              <div className="text-left">
-                <div className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider flex items-center gap-1">
-                  <span>Self Check-in Code</span>
-                  <span className="text-gray-400 font-normal">({liveCodeInfo.expires_in}s)</span>
+            <div className="flex items-center gap-2 bg-indigo-950/80 border border-indigo-700/70 rounded-xl px-3 py-1.5 text-indigo-200 shadow-inner min-w-[130px]">
+              <KeyRound size={15} className="text-indigo-400 animate-pulse shrink-0" />
+              <div className="text-left w-full">
+                <div className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider flex items-center justify-between gap-1">
+                  <span>Self Check-in</span>
+                  <span className="text-amber-400 font-mono text-[10px]">{liveCodeInfo.expires_in}s</span>
                 </div>
-                <div className="text-base font-mono font-bold tracking-widest text-amber-300">
+                <div className="text-base font-mono font-bold tracking-widest text-amber-300 leading-tight">
                   {liveCodeInfo.code}
+                </div>
+                {/* 30s Visual Countdown Progress Bar */}
+                <div className="w-full bg-gray-800 h-1 rounded-full mt-1 overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${Math.max(0, Math.min(100, (liveCodeInfo.expires_in / 30) * 100))}%` }}
+                  />
                 </div>
               </div>
             </div>
@@ -658,8 +665,8 @@ export default function Session() {
                       {session.is_active && (
                         <button
                           onClick={() => handleUnmark(r.student_id)}
-                          disabled={marking === r.student_id}
-                          className="text-gray-500 hover:text-red-400 transition-colors p-1 shrink-0"
+                          disabled={marking !== null || scanning}
+                          className="text-gray-500 hover:text-red-400 transition-colors p-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-400"
                           title="Remove Attendance"
                         >
                           {marking === r.student_id ? (
@@ -698,8 +705,8 @@ export default function Session() {
                       {session.is_active && (
                         <button
                           onClick={() => (isPresent ? handleUnmark(s.id) : handleManualMark(s))}
-                          disabled={marking === s.id}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                          disabled={marking !== null || scanning}
+                          className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                             isPresent
                               ? "bg-red-950/60 border border-red-800 text-red-300 hover:bg-red-900/60"
                               : "bg-indigo-950/60 border border-indigo-800 text-indigo-300 hover:bg-indigo-900/60"

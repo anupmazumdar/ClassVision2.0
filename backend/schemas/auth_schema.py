@@ -33,6 +33,7 @@ class RegisterRequest(BaseModel):
 
 class StudentLoginRequest(BaseModel):
     enrollment: str = Field(..., min_length=1, max_length=100)
+    pin: str = Field(..., min_length=4, max_length=6, description="4-6 digit second-factor security PIN")
     device_id: str = Field(..., min_length=1, max_length=255)
     device_info: str = Field(default="Web/Mobile Browser", max_length=255)
 

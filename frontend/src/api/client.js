@@ -8,7 +8,52 @@ const client = axios.create({
   withCredentials: true, // Automatically sends httpOnly authentication cookies
 });
 
-export function getErrorMessage(err, fallback = "An error occurred. Please try again.") {
+/**
+ * Two-tier Error Handling
+ * - Student Tier: User-friendly, actionable, non-technical instructions.
+ * - Teacher/Admin Tier: Detailed, verbatim technical diagnostic details with status code.
+ */
+export function getStudentErrorMessage(err, fallback = "Check-in failed. Please try again.") {
+  if (!err) return fallback;
+  const status = err.response?.status;
+  const rawDetail = err.response?.data?.detail;
+  const detailStr = typeof rawDetail === "string" ? rawDetail.toLowerCase() : "";
+
+  if (status === 429 || detailStr.includes("rate limit") || detailStr.includes("too many")) {
+    return "Too many requests. Please pause for 15 seconds before trying again.";
+  }
+  if (detailStr.includes("outside classroom") || detailStr.includes("geofence") || detailStr.includes("distance")) {
+    return "Location check failed: You are outside the 100m classroom perimeter. Move closer to class and retry.";
+  }
+  if (detailStr.includes("code") && (detailStr.includes("invalid") || detailStr.includes("expired") || detailStr.includes("empty"))) {
+    return "Invalid or expired session code. Check the 6-digit rolling code displayed on the teacher's screen.";
+  }
+  if (detailStr.includes("liveness") || detailStr.includes("anti-spoof") || detailStr.includes("burst") || detailStr.includes("static photo") || detailStr.includes("replay") || detailStr.includes("glare")) {
+    return "Liveness check failed. Please naturally blink or slightly move your head in front of the camera.";
+  }
+  if (detailStr.includes("no face") || detailStr.includes("not recognized") || detailStr.includes("similarity")) {
+    return "Face not recognized. Look directly into the camera in bright lighting without masks/sunglasses.";
+  }
+  if (detailStr.includes("device switch") || detailStr.includes("different device") || detailStr.includes("approve")) {
+    return "Device change requested. Please ask your class teacher or administrator to approve your new phone.";
+  }
+  if (detailStr.includes("cross-student") || detailStr.includes("impersonation")) {
+    return "Profile mismatch: The recognized student does not match your active login profile.";
+  }
+  if (err.message && err.message.toLowerCase().includes("network")) {
+    return "Network connection issue. Please verify your WiFi or mobile data connection.";
+  }
+  if (typeof rawDetail === "string" && rawDetail.length < 80) {
+    return rawDetail;
+  }
+  return fallback;
+}
+
+export function getErrorMessage(err, fallback = "An error occurred. Please try again.", role = "admin") {
+  if (role === "student") {
+    return getStudentErrorMessage(err, fallback);
+  }
+
   if (!err) return fallback;
   const detail = err.response?.data?.detail;
   if (typeof detail === "string") return detail;
@@ -16,7 +61,7 @@ export function getErrorMessage(err, fallback = "An error occurred. Please try a
     return detail
       .map((item) => {
         if (typeof item === "string") return item;
-        if (item?.msg) return item.msg;
+        if (item?.msg) return `${item.loc?.join(".") || "field"}: ${item.msg}`;
         return JSON.stringify(item);
       })
       .join("; ");
@@ -24,22 +69,17 @@ export function getErrorMessage(err, fallback = "An error occurred. Please try a
   if (detail && typeof detail === "object") {
     return detail.msg || JSON.stringify(detail);
   }
+  if (err.response?.status) {
+    return `HTTP ${err.response.status}: ${err.response.statusText || err.message || fallback}`;
+  }
   return err.message || fallback;
 }
 
-// HttpOnly cookies handle primary authentication.
-// Bearer header fallback is maintained if token is explicitly available.
-client.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem("cv_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
+// Primary authentication is handled purely via secure httpOnly cookies with credentials
 client.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      sessionStorage.removeItem("cv_token");
       sessionStorage.removeItem("cv_user");
       // Avoid redirect loops if already on login or checkin
       if (!window.location.pathname.includes("/login") && !window.location.pathname.includes("/checkin")) {
@@ -170,32 +210,28 @@ export const emailReport = (sessionId, to) =>
   client.post(`/reports/${sessionId}/email`, { to }).then((r) => r.data);
 
 export const downloadPdf = (sessionId) => {
-  const token = sessionStorage.getItem("cv_token");
-  const url = `${BASE_URL}/reports/${sessionId}/pdf`;
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    .then((res) => res.blob())
-    .then((blob) => {
+  return client
+    .get(`/reports/${sessionId}/pdf`, { responseType: "blob" })
+    .then((res) => {
+      const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = blobUrl;
       a.download = `attendance_${sessionId}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
+      URL.revokeObjectURL(blobUrl);
     });
 };
 
 export const downloadExcel = (sessionId) => {
-  const token = sessionStorage.getItem("cv_token");
-  const url = `${BASE_URL}/reports/${sessionId}/excel`;
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `attendance_${sessionId}.xlsx`;
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    .then((res) => res.blob())
-    .then((blob) => {
-      const blobUrl = URL.createObjectURL(blob);
+  return client
+    .get(`/reports/${sessionId}/excel`, { responseType: "blob" })
+    .then((res) => {
+      const blobUrl = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
       a.href = blobUrl;
+      a.download = `attendance_${sessionId}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -224,11 +260,12 @@ export const askAssistant = (message, history = []) =>
 export const getAssistantFaqs = () =>
   client.get("/assistant/faqs").then((r) => r.data);
 
-export const studentLogin = (enrollment, device_id = null, device_info = "Web Browser") => {
+export const studentLogin = (enrollment, pin, device_id = null, device_info = "Web Browser") => {
   const resolvedDeviceId = device_id || getDeviceId();
   return client
     .post("/auth/student-login", {
       enrollment,
+      pin,
       device_id: resolvedDeviceId,
       device_info,
     })

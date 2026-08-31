@@ -18,6 +18,7 @@ class Student(Base):
     semester = Column(Integer, default=1)  # 1 to 8
     admission_year = Column(Integer, default=2026)  # Calendar year of admission for auto-progression
     status = Column(String, default="active")  # active, graduated, inactive
+    pin_hash = Column(String, nullable=True)  # Second-factor 4-6 digit numeric PIN
     face_encodings = Column(EncryptedText, default="[]")
     device_id = Column(String, nullable=True)  # Bound device identifier
     device_approval_status = Column(String, default="approved")  # approved, pending_approval, rejected

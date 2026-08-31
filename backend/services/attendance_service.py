@@ -10,13 +10,39 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from config import ATTENDANCE_TICKET_SECRET
-from middleware.jwt_middleware import check_code_rate_limit, record_failed_code
+from config import ATTENDANCE_TICKET_SECRET, TICKET_EXPIRATION_SECONDS
+from middleware.jwt_middleware import check_code_rate_limit, check_device_checkin_velocity, record_failed_code
 from repositories import attendance_repo, session_repo, student_repo
 from .face_service import decode_image, recognize_faces, verify_liveness
 from .session_service import verify_session_code
 
-TICKET_EXPIRATION_SECONDS = 15
+# In-memory student last-known GPS location tracker: student_id -> (lat, lon, timestamp)
+_STUDENT_LAST_KNOWN_GPS: dict[int, tuple[float, float, float]] = {}
+
+
+def check_gps_plausibility(student_id: int, lat: float, lng: float) -> None:
+    """Validates coordinate ranges and rejects impossible terrestrial travel velocities (> 1000 km/h) between consecutive check-ins."""
+    if lat < -90.0 or lat > 90.0 or lng < -180.0 or lng > 180.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid GPS coordinates: Latitude must be between -90 and 90, Longitude between -180 and 180.",
+        )
+
+    now = time.time()
+    if student_id in _STUDENT_LAST_KNOWN_GPS:
+        prev_lat, prev_lng, prev_ts = _STUDENT_LAST_KNOWN_GPS[student_id]
+        dt_seconds = now - prev_ts
+        if 0 < dt_seconds < 7200:  # Within past 2 hours
+            distance_meters = calculate_haversine_distance(prev_lat, prev_lng, lat, lng)
+            dt_hours = dt_seconds / 3600.0
+            speed_kmh = (distance_meters / 1000.0) / dt_hours
+            if speed_kmh > 1000.0:  # Exceeds maximum commercial aircraft / terrestrial velocity
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"GPS Anomaly Detected: Impossible travel speed ({int(speed_kmh)} km/h) detected between consecutive check-ins. Mock-location spoofing rejected.",
+                )
+
+    _STUDENT_LAST_KNOWN_GPS[student_id] = (lat, lng, now)
 
 
 def calculate_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -182,15 +208,17 @@ def scan_and_mark_atomic(
     lng: Optional[float] = None,
     code: Optional[str] = None,
     device_id: Optional[str] = None,
+    client_ip: Optional[str] = None,
+    caller_student_id: Optional[int] = None,
 ) -> dict:
     """Atomic server-side verification: liveness -> recognition -> geofence/code/device -> attendance mark."""
     session = session_repo.get_session_by_id(db, session_id)
     if not session or not session.is_active:
         raise HTTPException(status_code=400, detail="Session not found or not active")
 
-    # 1. Rotating Code Check with Rate Limiting (5 attempts / 30s)
+    # 1. Rotating Code Check with IP-based Rate Limiting (5 attempts / 30s)
     if session.require_code:
-        rate_key = f"{session_id}:{device_id or 'anon'}"
+        rate_key = f"{session_id}:{client_ip or device_id or 'anon'}"
         check_code_rate_limit(rate_key, max_attempts=5, window_seconds=30)
         if not code or not verify_session_code(session_id, code):
             record_failed_code(rate_key)
@@ -248,12 +276,17 @@ def scan_and_mark_atomic(
 
     for face in recognized:
         st_id = face["student_id"]
+        # Authorization check: student caller can only mark their own attendance
+        if caller_student_id is not None and caller_student_id != st_id:
+            continue
+
         st = student_repo.get_student_by_id(db, st_id)
         if not st:
             continue
 
-        # Device Binding Check
+        # Device Binding & Anomaly Checks
         if device_id:
+            check_device_checkin_velocity(device_id, st_id, max_distinct_students=3, window_seconds=300)
             if st.device_id and st.device_id != device_id:
                 raise HTTPException(
                     status_code=403,
@@ -261,6 +294,9 @@ def scan_and_mark_atomic(
                 )
             elif not st.device_id:
                 student_repo.bind_student_device(db, st, device_id)
+
+        if lat is not None and lng is not None:
+            check_gps_plausibility(st_id, lat, lng)
 
         # Check existing
         existing = attendance_repo.get_session_student_record(db, session_id, st_id)
@@ -287,6 +323,12 @@ def scan_and_mark_atomic(
                 "already_present": False,
             })
 
+    if caller_student_id is not None and not marked_results:
+        raise HTTPException(
+            status_code=403,
+            detail="Security Violation: Recognized face does not match the logged-in student account.",
+        )
+
     return {
         "recognized": recognized,
         "marked": marked_results,
@@ -303,8 +345,17 @@ def mark_attendance_with_ticket(
     lng: Optional[float] = None,
     code: Optional[str] = None,
     device_id: Optional[str] = None,
+    client_ip: Optional[str] = None,
+    caller_student_id: Optional[int] = None,
 ) -> dict:
-    """Marks attendance verifying cryptographic ticket issued by server face recognition."""
+    """Marks attendance verified by cryptographic attendance ticket with geofencing + 30s code verification."""
+    # 0. Caller Student ID authorization check
+    if caller_student_id is not None and caller_student_id != student_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Security Violation: Logged-in student is not authorized to submit attendance for another student account.",
+        )
+
     session = session_repo.get_session_by_id(db, session_id)
     if not session or not session.is_active:
         raise HTTPException(status_code=400, detail="Session not found or not active")
@@ -322,9 +373,9 @@ def mark_attendance_with_ticket(
     ticket_payload = verify_attendance_ticket(attendance_ticket, session_id, student_id)
     verified_confidence = ticket_payload.get("confidence", 0.0)
 
-    # 2. Rotating Code Verification with Rate Limiting (5 attempts / 30s)
+    # 2. Rotating Code Verification with IP-based Rate Limiting (5 attempts / 30s)
     if session.require_code:
-        rate_key = f"{session_id}:{device_id or 'anon'}"
+        rate_key = f"{session_id}:{client_ip or device_id or 'anon'}"
         check_code_rate_limit(rate_key, max_attempts=5, window_seconds=30)
         if not code or not verify_session_code(session_id, code):
             record_failed_code(rate_key)
@@ -350,28 +401,42 @@ def mark_attendance_with_ticket(
                 detail=f"Geofence check failed: You are {distance:.1f}m away from class (allowed radius: {max_allowed}m).",
             )
 
-    # 4. Device Binding Check
+    # 4. Device ID Binding Verification
     if device_id:
         if student.device_id and student.device_id != device_id:
             raise HTTPException(
                 status_code=403,
-                detail="Device mismatch: This student account is already bound to another registered device.",
+                detail="Device mismatch: Student is registered to another device. Proxy check-ins are blocked.",
             )
         elif not student.device_id:
             student_repo.bind_student_device(db, student, device_id)
 
-    # Check for duplicate
+    # 5. Check if already marked
     existing = attendance_repo.get_session_student_record(db, session_id, student_id)
     if existing:
-        return {"message": "Already marked", "already_present": True}
+        return {
+            "message": "Attendance already recorded for this session",
+            "student_id": student_id,
+            "name": student.name,
+            "enrollment": student.enrollment,
+            "session_id": session_id,
+            "confidence": verified_confidence,
+            "already_present": True,
+        }
 
-    attendance_repo.create_record(
-        db,
-        session_id=session_id,
-        student_id=student_id,
-        confidence=verified_confidence,
+    # Record attendance
+    record = attendance_repo.create_record(
+        db, session_id=session_id, student_id=student_id, confidence=verified_confidence
     )
-    return {"message": "Marked present", "already_present": False}
+    return {
+        "message": f"Attendance marked for {student.name}",
+        "student_id": student_id,
+        "name": student.name,
+        "enrollment": student.enrollment,
+        "session_id": session_id,
+        "confidence": record.confidence,
+        "already_present": False,
+    }
 
 
 def manual_mark_teacher(
@@ -414,10 +479,16 @@ def self_checkin_by_student(
     image: Optional[str] = None,
     frames: Optional[List[str]] = None,
     device_id: Optional[str] = None,
+    client_ip: Optional[str] = None,
+    caller_student_id: Optional[int] = None,
 ) -> dict:
     """Self check-in for students using the 6-digit rolling session code, GPS geofence, and facial biometrics."""
+    rate_key = f"self_checkin:{client_ip or device_id or 'anon'}"
+    check_code_rate_limit(rate_key, max_attempts=5, window_seconds=30)
+
     cleaned_code = str(code).strip()
     if not cleaned_code:
+        record_failed_code(rate_key)
         raise HTTPException(status_code=400, detail="Please enter the 6-digit session code.")
 
     # 1. Locate the active session matching this 6-digit code
@@ -429,6 +500,7 @@ def self_checkin_by_student(
             break
 
     if not matched_session:
+        record_failed_code(rate_key)
         raise HTTPException(
             status_code=400,
             detail="Invalid or expired 6-digit session code. Please check the code currently displayed on the teacher's screen.",
@@ -452,21 +524,27 @@ def self_checkin_by_student(
                 detail=f"Geofence check failed: You are {int(distance_meters)}m away from the classroom (allowed radius: {int(max_allowed)}m). You must be present inside the classroom to check in.",
             )
 
-    # 3. Biometric Face Image & Liveness Verification
-    primary_img_b64 = image or (frames[0] if frames and len(frames) > 0 else None)
-    if not primary_img_b64:
-        raise HTTPException(status_code=400, detail="Face capture is required for self check-in.")
+    # 3. Biometric Face Image & Mandatory Burst-Frame Liveness Verification
+    if not frames or len(frames) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Anti-Spoofing Requirement: Multi-frame burst capture (minimum 2 frames) required for self check-in.",
+        )
 
-    # Liveness check if sequential burst frames provided
-    if frames and len(frames) >= 2:
-        liveness_res = verify_liveness(frames)
+    try:
+        decoded_frames = [decode_image(f) for f in frames]
+        liveness_res = verify_liveness(decoded_frames)
         if not liveness_res.get("is_live", False):
             raise HTTPException(
                 status_code=403,
-                detail=f"Anti-Spoofing check failed: {liveness_res.get('details', 'Static photo or screen spoofing detected')}. Please capture a live selfie with natural movement.",
+                detail=f"Anti-Spoofing check failed: {liveness_res.get('reason', 'Static photo or screen spoofing detected')}. Please capture a live selfie with natural movement.",
             )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to process burst frames: {e}")
 
-    # Decode and recognize face
+    primary_img_b64 = image or frames[0]
     img_bgr = decode_image(primary_img_b64)
     all_students = student_repo.list_students(db)
     recognized = recognize_faces(img_bgr, all_students)
@@ -479,12 +557,21 @@ def self_checkin_by_student(
 
     top_match = recognized[0]
     matched_student_id = top_match["student_id"]
+
+    # Student caller authorization check
+    if caller_student_id is not None and matched_student_id != caller_student_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Security Violation: Recognized face does not match the logged-in student account.",
+        )
+
     student = student_repo.get_student_by_id(db, matched_student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student record not found.")
 
-    # 4. Device Binding Check
+    # 4. Device Binding & Anomaly Checks
     if device_id:
+        check_device_checkin_velocity(device_id, matched_student_id, max_distinct_students=3, window_seconds=300)
         if student.device_id and student.device_id != device_id:
             raise HTTPException(
                 status_code=403,
@@ -492,6 +579,9 @@ def self_checkin_by_student(
             )
         elif not student.device_id:
             student_repo.bind_student_device(db, student, device_id)
+
+    if lat is not None and lng is not None:
+        check_gps_plausibility(matched_student_id, lat, lng)
 
     # 5. Check if already marked in this session
     existing = attendance_repo.get_session_student_record(db, matched_session.id, matched_student_id)

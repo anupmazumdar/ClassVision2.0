@@ -5,10 +5,10 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from config import SESSION_CODE_SECRET
+from config import CODE_EXPIRATION_SECONDS, SESSION_CODE_SECRET
 from repositories import attendance_repo, session_repo
 
-CODE_ROTATION_WINDOW = 30  # seconds
+CODE_ROTATION_WINDOW = CODE_EXPIRATION_SECONDS
 
 
 def _generate_code(session_id: int, time_step: int) -> str:
@@ -122,12 +122,18 @@ def stop_session(
     return {"message": "Session ended", "present_count": count}
 
 
-def get_session(db: Session, session_id: int) -> dict:
+def get_session(db: Session, session_id: int, current_user: Optional[dict] = None) -> dict:
     session = session_repo.get_session_by_id(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     records = attendance_repo.list_session_records_with_students(db, session_id)
+
+    # If caller is a student, restrict attendance roster to only their own record (prevent IDOR roster harvesting)
+    if current_user and current_user.get("role") == "student":
+        student_id = int(current_user["sub"])
+        records = [(r, s) for r, s in records if s.id == student_id]
+
     attendance = [
         {
             "student_id": s.id,

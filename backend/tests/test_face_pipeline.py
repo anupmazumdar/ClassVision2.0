@@ -155,3 +155,21 @@ def test_face_recognition_matching_and_confidence():
         assert matches[0]["name"] == "Alice Test"
         assert matches[0]["confidence"] >= 80.0
         assert matches[0]["similarity"] >= 0.78
+
+
+def test_screen_reflection_spoof_rejection():
+    """Tests that screen reflection glare is detected and rejected."""
+    np.random.seed(42)
+    frame1 = np.random.randint(40, 220, (240, 320, 3), dtype=np.uint8)
+    # Simulate screen reflection (large clipping white patch over face region)
+    frame1[50:150, 50:150] = 255
+    frame2 = frame1.copy()
+    frame2[50:150, 50:150] = 254
+
+    mock_cascade = MagicMock()
+    mock_cascade.detectMultiScale.return_value = [(50, 50, 100, 100)]
+
+    with patch.object(face_service, "_CASCADE", mock_cascade):
+        res = face_service.verify_liveness([frame1, frame2])
+        assert res["is_live"] is False
+        assert "Video replay / screen spoofing detected" in res["reason"]

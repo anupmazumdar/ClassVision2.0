@@ -10,12 +10,12 @@ class MaterialCreate(BaseModel):
     course: Optional[str] = Field(default="All", max_length=50)
     branch: Optional[str] = Field(default="All", max_length=100)
     year: Optional[str] = Field(default="All", max_length=50)
-    description: Optional[str] = Field(default="")
-    attachment_url: Optional[str] = Field(default=None)
-    attachment_name: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default="", max_length=5000)
+    attachment_url: Optional[str] = Field(default=None, max_length=2048)
+    attachment_name: Optional[str] = Field(default=None, max_length=255)
     due_date: Optional[datetime] = Field(default=None)
     total_marks: Optional[int] = Field(default=None, ge=0)
-    whatsapp_group_link: Optional[str] = Field(default=None)
+    whatsapp_group_link: Optional[str] = Field(default=None, max_length=2048)
 
 
 class MaterialUpdate(BaseModel):
@@ -25,12 +25,12 @@ class MaterialUpdate(BaseModel):
     course: Optional[str] = Field(default=None, max_length=50)
     branch: Optional[str] = Field(default=None, max_length=100)
     year: Optional[str] = Field(default=None, max_length=50)
-    description: Optional[str] = Field(default=None)
-    attachment_url: Optional[str] = Field(default=None)
-    attachment_name: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    attachment_url: Optional[str] = Field(default=None, max_length=2048)
+    attachment_name: Optional[str] = Field(default=None, max_length=255)
     due_date: Optional[datetime] = Field(default=None)
     total_marks: Optional[int] = Field(default=None, ge=0)
-    whatsapp_group_link: Optional[str] = Field(default=None)
+    whatsapp_group_link: Optional[str] = Field(default=None, max_length=2048)
 
 
 class MaterialResponse(BaseModel):

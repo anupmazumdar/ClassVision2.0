@@ -146,6 +146,39 @@ def recognize_faces(image_array: np.ndarray, students: list) -> List[dict]:
     return results
 
 
+def _detect_screen_moire_or_glare(face_roi: np.ndarray) -> Dict:
+    """Detects screen raster/moire patterns and specular reflection glare characteristic of phone/tablet video replay."""
+    if face_roi is None or face_roi.size == 0 or min(face_roi.shape[:2]) < 20:
+        return {"is_spoof": False}
+
+    # 1. Specular Glare Analysis (screen glass reflection)
+    if len(face_roi.shape) == 3 and face_roi.shape[2] == 3:
+        clipping_mask = (face_roi[:, :, 0] > 252) & (face_roi[:, :, 1] > 252) & (face_roi[:, :, 2] > 252)
+        glare_ratio = float(np.mean(clipping_mask))
+        if glare_ratio > 0.45:
+            return {"is_spoof": True, "reason": "Screen reflection or excessive specular glare detected."}
+
+    # 2. High-Frequency 2D FFT Frequency Analysis for Screen Pixel Pitch / Moire
+    try:
+        gray_roi = cv2.cvtColor(face_roi, cv2.COLOR_RGB2GRAY) if len(face_roi.shape) == 3 else face_roi
+        resized = cv2.resize(gray_roi, (64, 64)).astype(np.float32)
+        f_transform = np.fft.fft2(resized)
+        f_shift = np.fft.fftshift(f_transform)
+        magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1e-6)
+
+        total_mean = float(np.mean(magnitude_spectrum))
+        max_val = float(np.max(magnitude_spectrum))
+        peak_ratio = max_val / (total_mean + 1e-6)
+
+        # Severe periodic resonance spikes outside DC center indicate screen raster lines
+        if peak_ratio > 9.5 and total_mean > 130.0:
+            return {"is_spoof": True, "reason": "Screen moire pattern / digital raster frequency detected."}
+    except Exception:
+        pass
+
+    return {"is_spoof": False}
+
+
 def verify_liveness(frames: List[np.ndarray]) -> Dict:
     """
     Validates anti-spoofing liveness by analyzing consecutive burst frames.
@@ -154,21 +187,44 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
       2. Faces detected in frames
       3. Frame difference / micro-motion delta (rejects static photos and clones)
       4. Texture and Laplacian variance (rejects flat low-resolution screen replays)
+      5. Screen moire and specular reflection glare heuristic (rejects phone/tablet screen replays)
     """
     if not frames or len(frames) < 2:
         return {"is_live": False, "reason": "At least 2 burst frames required for liveness verification."}
 
-    grays = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in frames]
+    grays = []
+    for f in frames:
+        if f is None or not isinstance(f, np.ndarray) or f.size == 0:
+            return {"is_live": False, "reason": "Invalid or empty frame array."}
+        if len(f.shape) == 3 and f.shape[2] >= 3:
+            g = cv2.cvtColor(f, cv2.COLOR_RGB2GRAY)
+        else:
+            g = f
+        grays.append(np.ascontiguousarray(g, dtype=np.uint8))
 
     # Check 1: Face detection across frames
     detected_faces = []
     for gray in grays:
-        faces = _CASCADE.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        try:
+            faces = _CASCADE.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        except Exception:
+            faces = [(0, 0, gray.shape[1], gray.shape[0])]
         if len(faces) == 0:
             return {"is_live": False, "reason": "Face not continuously detected across burst frames."}
         detected_faces.append(faces[0])
 
-    # Check 2: Micro-motion delta between consecutive frames
+    # Check 2: Screen Moire & Reflection Glare Analysis (rejects digital display / video replay spoofing)
+    for idx, (fx, fy, fw, fh) in enumerate(detected_faces):
+        orig_frame = frames[idx]
+        face_roi = orig_frame[fy : fy + fh, fx : fx + fw]
+        screen_check = _detect_screen_moire_or_glare(face_roi)
+        if screen_check["is_spoof"]:
+            return {
+                "is_live": False,
+                "reason": f"Video replay / screen spoofing detected: {screen_check['reason']}",
+            }
+
+    # Check 3: Micro-motion delta between consecutive frames
     diffs = []
     for i in range(len(grays) - 1):
         g1 = cv2.resize(grays[i], (320, 240))
@@ -195,7 +251,7 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
             "reason": "Excessive camera shake or scene transition detected.",
         }
 
-    # Check 3: Texture & Blur analysis via Laplacian variance
+    # Check 4: Texture & Blur analysis via Laplacian variance
     lap_vars = [cv2.Laplacian(g, cv2.CV_64F).var() for g in grays]
     avg_lap = sum(lap_vars) / len(lap_vars)
 

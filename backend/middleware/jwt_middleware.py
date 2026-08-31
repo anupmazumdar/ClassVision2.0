@@ -1,4 +1,6 @@
+import hashlib
 import logging
+import secrets
 import time
 from collections import defaultdict
 from datetime import timedelta
@@ -32,6 +34,10 @@ if REDIS_URL:
 # In-memory sliding-window rate limiters (fallback / development)
 _LOGIN_ATTEMPTS = defaultdict(list)
 _CODE_ATTEMPTS = defaultdict(list)
+_COMPUTE_ATTEMPTS = defaultdict(list)
+_EMAIL_ATTEMPTS = defaultdict(list)
+_DEVICE_CHECKIN_VELOCITY = defaultdict(list)
+_REVOKED_TOKENS = set()
 
 
 def get_client_ip(request: Request) -> str:
@@ -58,8 +64,37 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
+def is_token_revoked(token_id: str) -> bool:
+    """Checks whether a token JTI or hash has been revoked / blacklisted."""
+    if _redis_client is not None:
+        try:
+            return bool(_redis_client.exists(f"revoked:{token_id}"))
+        except Exception:
+            pass
+    return token_id in _REVOKED_TOKENS
+
+
+def revoke_token(token: str) -> None:
+    """Revokes a JWT token on logout, invalidating server-side session."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        jti = payload.get("jti") or hashlib.sha256(token.encode()).hexdigest()
+        exp = payload.get("exp", 0)
+        remaining = max(60, int(exp - time.time()))
+        if _redis_client is not None:
+            try:
+                _redis_client.setex(f"revoked:{jti}", remaining, "1")
+            except Exception:
+                pass
+        _REVOKED_TOKENS.add(jti)
+    except Exception:
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        _REVOKED_TOKENS.add(token_hash)
+
+
 def create_token(user_id: int, email: str, role: str, name: str) -> str:
     payload = {
+        "jti": secrets.token_hex(16),
         "sub": str(user_id),
         "email": email,
         "role": role,
@@ -71,6 +106,7 @@ def create_token(user_id: int, email: str, role: str, name: str) -> str:
 
 def create_student_token(student_id: int, enrollment: str, name: str, course: str, branch: str, year: int) -> str:
     payload = {
+        "jti": secrets.token_hex(16),
         "sub": str(student_id),
         "enrollment": enrollment,
         "role": "student",
@@ -85,11 +121,22 @@ def create_student_token(student_id: int, enrollment: str, name: str, course: st
 
 def decode_token(token: str) -> Dict:
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        jti = payload.get("jti") or hashlib.sha256(token.encode()).hexdigest()
+        if is_token_revoked(jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return payload
+    except HTTPException:
+        raise
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
 
@@ -211,3 +258,84 @@ def record_failed_code(key: str, window_seconds: int = 30):
             logging.debug(f"[REDIS] Error recording failed code: {e}")
 
     _CODE_ATTEMPTS[key].append(time.time())
+
+
+def check_compute_rate_limit(client_ip: str, max_requests: int = 30, window_seconds: int = 60):
+    """Limits compute-heavy face recognition / OpenCV requests per IP to protect against DoS attacks."""
+    if _redis_client is not None:
+        try:
+            key = f"rate:compute:{client_ip}"
+            count = _redis_client.incr(key)
+            if count == 1:
+                _redis_client.expire(key, window_seconds)
+            if count > max_requests:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many facial recognition requests. Please wait a moment before trying again.",
+                )
+            return
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.debug(f"[REDIS] Error in compute rate limit: {e}")
+
+    now = time.time()
+    attempts = [t for t in _COMPUTE_ATTEMPTS[client_ip] if now - t < window_seconds]
+    if len(attempts) >= max_requests:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many facial recognition requests. Please wait a moment before trying again.",
+        )
+    attempts.append(now)
+    _COMPUTE_ATTEMPTS[client_ip] = attempts
+
+
+def check_email_rate_limit(key: str, max_requests: int = 5, window_seconds: int = 60):
+    """Limits attendance report email dispatches per caller/IP to prevent spamming."""
+    if _redis_client is not None:
+        try:
+            rkey = f"rate:email:{key}"
+            count = _redis_client.incr(rkey)
+            if count == 1:
+                _redis_client.expire(rkey, window_seconds)
+            if count > max_requests:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Email rate limit reached. Please wait 1 minute before sending another report.",
+                )
+            return
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.debug(f"[REDIS] Error in email rate limit: {e}")
+
+    now = time.time()
+    attempts = [t for t in _EMAIL_ATTEMPTS[key] if now - t < window_seconds]
+    if len(attempts) >= max_requests:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Email rate limit reached. Please wait 1 minute before sending another report.",
+        )
+    attempts.append(now)
+    _EMAIL_ATTEMPTS[key] = attempts
+
+
+def check_device_checkin_velocity(device_id: str, student_id: int, max_distinct_students: int = 3, window_seconds: int = 300):
+    """Anomaly detection: Blocks a single hardware device from rapidly submitting check-ins for multiple different students."""
+    if not device_id:
+        return
+
+    now = time.time()
+    recent = [(sid, ts) for sid, ts in _DEVICE_CHECKIN_VELOCITY[device_id] if now - ts < window_seconds]
+    distinct_students = {sid for sid, _ in recent}
+    distinct_students.add(student_id)
+
+    if len(distinct_students) > max_distinct_students:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Security Anomaly: Excessive distinct student check-ins detected from this device. Please wait {window_seconds // 60} minutes.",
+        )
+
+    recent.append((student_id, now))
+    _DEVICE_CHECKIN_VELOCITY[device_id] = recent
+

@@ -59,9 +59,9 @@ def stop_session(
 def get_session(
     session_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    return session_service.get_session(db, session_id)
+    return session_service.get_session(db, session_id, current_user=current_user)
 
 
 @router.delete("/{session_id}", status_code=204)

@@ -25,10 +25,23 @@ export default function StudentCheckin() {
   const [location, setLocation] = useState(null);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState("");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
+
+  // Monitor network online/offline status
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   // Request GPS on mount
   useEffect(() => {
@@ -106,7 +119,7 @@ export default function StudentCheckin() {
       setSuccessData(res);
       camRef.current?.stop();
     } catch (err) {
-      setError(getErrorMessage(err, "Self check-in failed. Please try again."));
+      setError(getErrorMessage(err, "Self check-in failed. Please try again.", "student"));
     } finally {
       setCheckingIn(false);
     }
@@ -141,6 +154,17 @@ export default function StudentCheckin() {
 
       {/* Main Card */}
       <div className="w-full max-w-md card border-gray-800 bg-gray-900/90 shadow-2xl p-5 sm:p-6 space-y-5">
+        {/* Screen Reader Live Region */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {checkingIn
+            ? "Capturing biometric burst frames and verifying classroom geofence..."
+            : error
+            ? `Check-in error: ${error}`
+            : successData
+            ? `Attendance marked successfully for ${successData.name}.`
+            : ""}
+        </div>
+
         {/* SUCCESS VIEW */}
         {successData ? (
           <div className="text-center py-4 space-y-5 animate-in fade-in zoom-in-95 duration-300">
@@ -178,7 +202,7 @@ export default function StudentCheckin() {
 
             <button
               onClick={resetForm}
-              className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 text-sm"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               <RefreshCw size={15} /> Check In for Another Class
             </button>
@@ -186,14 +210,34 @@ export default function StudentCheckin() {
         ) : (
           /* FORM VIEW */
           <form onSubmit={handleSelfCheckin} className="space-y-4">
+            {!isOnline && (
+              <div role="alert" className="p-3 bg-amber-950/70 border border-amber-800/80 rounded-xl text-amber-300 text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0 text-amber-400" />
+                <span>You are currently offline. Check-ins require an active internet connection to verify location & biometrics.</span>
+              </div>
+            )}
+
             {/* Step 1: 6-Digit Session Code */}
             <div>
-              <label htmlFor="session-code" className="label flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-semibold text-gray-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="session-code" className="label flex items-center gap-1.5 mb-0 font-semibold text-gray-200">
                   <KeyRound size={15} className="text-amber-400" /> Enter 6-Digit Session Code
-                </span>
-                <span className="text-[11px] text-gray-500">From Teacher's Screen</span>
-              </label>
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      const digits = text.replace(/\D/g, "").slice(0, 6);
+                      if (digits) setCode(digits);
+                    } catch {}
+                  }}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 transition-colors font-medium cursor-pointer"
+                  title="Paste 6-digit code from clipboard"
+                >
+                  Paste Code
+                </button>
+              </div>
               <input
                 id="session-code"
                 type="text"
@@ -203,7 +247,7 @@ export default function StudentCheckin() {
                 placeholder="• • • • • •"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                className="input text-center text-2xl font-mono tracking-widest font-bold py-3 bg-gray-950 border-gray-700 text-amber-300 placeholder-gray-700 focus:border-amber-500"
+                className="input text-center text-2xl font-mono tracking-widest font-bold py-3 bg-gray-950 border-gray-700 text-amber-300 placeholder-gray-700 focus:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-400"
                 required
                 autoFocus
               />

@@ -11,6 +11,7 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState("teacher"); // "teacher" | "student"
   const [teacherForm, setTeacherForm] = useState({ email: "", password: "" });
   const [studentEnrollment, setStudentEnrollment] = useState("");
+  const [studentPin, setStudentPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,8 +36,14 @@ export default function Login() {
     setError("");
     setLoading(true);
     const cleanEnrollment = studentEnrollment.trim();
+    const cleanPin = studentPin.trim();
+    if (!cleanPin) {
+      setError("Please enter your 4-6 digit security PIN.");
+      setLoading(false);
+      return;
+    }
     try {
-      const data = await studentLogin(cleanEnrollment, null, navigator.userAgent.slice(0, 100));
+      const data = await studentLogin(cleanEnrollment, cleanPin, null, navigator.userAgent.slice(0, 100));
       signIn(
         {
           id: data.id,
@@ -52,11 +59,13 @@ export default function Login() {
       );
       navigate("/classroom");
     } catch (err) {
-      setError(getErrorMessage(err, "Student login failed. Verify enrollment or device approval."));
+      setError(getErrorMessage(err, "Student login failed. Verify enrollment, PIN or device approval."));
     } finally {
       setLoading(false);
     }
   };
+
+  const [showDeviceHelp, setShowDeviceHelp] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4 py-8">
@@ -85,7 +94,7 @@ export default function Login() {
               setActiveTab("teacher");
               setError("");
             }}
-            className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
               activeTab === "teacher"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "text-gray-400 hover:text-gray-200"
@@ -99,7 +108,7 @@ export default function Login() {
               setActiveTab("student");
               setError("");
             }}
-            className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
               activeTab === "student"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "text-gray-400 hover:text-gray-200"
@@ -167,13 +176,35 @@ export default function Login() {
             /* STUDENT PORTAL LOGIN */
             <form onSubmit={handleStudentSubmit} className="space-y-4">
               <div className="p-3 bg-indigo-950/40 border border-indigo-800/60 rounded-xl space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-indigo-300 font-semibold">
-                  <Smartphone size={13} /> 1-Device Hardware Binding Active
+                <div className="flex items-center justify-between text-xs text-indigo-300 font-semibold">
+                  <span className="flex items-center gap-1.5"><Smartphone size={13} /> 1-Device Hardware Binding Active</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeviceHelp((h) => !h)}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-200 underline font-normal focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400"
+                  >
+                    Changed phone?
+                  </button>
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
                   Only your registered device can access your designated course materials, assignments & quizzes.
                 </p>
               </div>
+
+              {/* Collapsible Device Change Recovery Guide */}
+              {showDeviceHelp && (
+                <div className="p-3.5 bg-gray-950 border border-indigo-500/40 rounded-xl text-xs space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-1.5 font-semibold text-indigo-300">
+                    <ShieldCheck size={14} /> My Phone Changed — How It Works
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-gray-300 text-[11px] leading-relaxed">
+                    <li>Enter your Enrollment Number & Security PIN on your new device below.</li>
+                    <li>Click <strong>Access My Student Hub</strong> to submit an automatic device reset request.</li>
+                    <li>Notify your class teacher or administrator to approve the request on their admin portal.</li>
+                    <li>Once approved, your new phone will be instantly bound to your student account!</li>
+                  </ol>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="student-enrollment-input" className="label">Student Enrollment / Roll Number</label>
@@ -187,10 +218,42 @@ export default function Login() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="student-pin-input" className="label flex items-center justify-between">
+                  <span>Security PIN (Second Factor)</span>
+                  <span className="text-[10px] text-gray-500">4-6 Digits</span>
+                </label>
+                <input
+                  id="student-pin-input"
+                  type="password"
+                  maxLength={6}
+                  inputMode="numeric"
+                  placeholder="••••"
+                  className="input font-mono tracking-widest text-center font-bold"
+                  value={studentPin}
+                  onChange={(e) => setStudentPin(e.target.value.replace(/\D/g, ""))}
+                  required
+                />
+              </div>
+
               {error && (
-                <div role="alert" className="text-red-400 text-xs bg-red-950/50 border border-red-800 p-2.5 rounded-lg flex items-start gap-2">
-                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                <div
+                  role="alert"
+                  className={`text-xs p-3 rounded-lg flex items-start gap-2 ${
+                    error.toLowerCase().includes("switch") || error.toLowerCase().includes("approve")
+                      ? "text-amber-300 bg-amber-950/60 border border-amber-800/80"
+                      : "text-red-400 bg-red-950/50 border border-red-800"
+                  }`}
+                >
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold leading-snug">{error}</p>
+                    {(error.toLowerCase().includes("switch") || error.toLowerCase().includes("approve")) && (
+                      <p className="text-[11px] text-gray-300 leading-normal">
+                        Your device switch request is recorded in the admin audit queue. Ask your teacher or admin to approve your new phone.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -217,7 +280,7 @@ export default function Login() {
           <div className="mt-5 pt-4 border-t border-gray-800 text-center">
             <Link
               to="/checkin"
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1.5 transition-colors"
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400"
             >
               <QrCode size={13} />
               <span>Live Attendance Self Check-in Portal (100m Geofence) →</span>

@@ -18,6 +18,27 @@ test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread"
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiters():
+    from middleware import jwt_middleware
+    from services import attendance_service
+    jwt_middleware._LOGIN_ATTEMPTS.clear()
+    jwt_middleware._CODE_ATTEMPTS.clear()
+    jwt_middleware._COMPUTE_ATTEMPTS.clear()
+    jwt_middleware._EMAIL_ATTEMPTS.clear()
+    jwt_middleware._DEVICE_CHECKIN_VELOCITY.clear()
+    jwt_middleware._REVOKED_TOKENS.clear()
+    attendance_service._STUDENT_LAST_KNOWN_GPS.clear()
+    yield
+    jwt_middleware._LOGIN_ATTEMPTS.clear()
+    jwt_middleware._CODE_ATTEMPTS.clear()
+    jwt_middleware._COMPUTE_ATTEMPTS.clear()
+    jwt_middleware._EMAIL_ATTEMPTS.clear()
+    jwt_middleware._DEVICE_CHECKIN_VELOCITY.clear()
+    jwt_middleware._REVOKED_TOKENS.clear()
+    attendance_service._STUDENT_LAST_KNOWN_GPS.clear()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     Base.metadata.create_all(bind=test_engine)

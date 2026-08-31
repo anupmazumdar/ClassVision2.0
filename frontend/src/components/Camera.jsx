@@ -177,8 +177,23 @@ const Camera = forwardRef(function Camera(
     setShowSettings(false);
   };
 
+  const [statusAnnouncement, setStatusAnnouncement] = useState("Initializing camera...");
+
+  useEffect(() => {
+    if (ready) {
+      setStatusAnnouncement("Camera active and ready.");
+    } else if (error) {
+      setStatusAnnouncement(`Camera error: ${error}`);
+    }
+  }, [ready, error]);
+
   return (
     <div className={`relative rounded-xl overflow-hidden bg-gray-950 border border-gray-800 ${className}`}>
+      {/* Screen reader live status announcement */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {statusAnnouncement}
+      </div>
+
       {/* Video / IP cam display */}
       {ipMode && ipUrl ? (
         <img
@@ -187,8 +202,8 @@ const Camera = forwardRef(function Camera(
           alt="IP Camera Live Feed"
           aria-label="IP Camera Live Feed"
           className="w-full h-full object-cover"
-          onLoad={() => setReady(true)}
-          onError={() => setError("Cannot connect to IP camera. Check the URL and network connection.")}
+          onLoad={() => { setReady(true); setStatusAnnouncement("IP camera feed connected."); }}
+          onError={() => { setError("Cannot connect to IP camera. Check the URL and network connection."); }}
         />
       ) : (
         <video
@@ -221,7 +236,7 @@ const Camera = forwardRef(function Camera(
           <CameraOff size={36} className="text-red-400 mb-2.5" />
           <p className="text-gray-200 text-sm font-medium leading-relaxed max-w-xs">{error}</p>
           <button
-            className="mt-4 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-colors"
+            className="mt-4 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
             onClick={() => { setError(null); ipMode ? setIpMode(false) : startCamera(deviceId); }}
             aria-label="Retry camera connection"
           >
@@ -235,7 +250,7 @@ const Camera = forwardRef(function Camera(
         onClick={() => setShowSettings((s) => !s)}
         aria-label="Camera Settings and Source Selector"
         aria-expanded={showSettings}
-        className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-300 hover:text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition-colors z-30"
+        className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-300 hover:text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition-colors z-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
       >
         {ipMode ? <Wifi size={12} className="text-blue-400" /> : <CameraIcon size={12} />}
         {ipMode ? "IP Cam" : devices.find((d) => d.deviceId === deviceId)?.label?.split("(")[0]?.trim() || "Camera"}
@@ -257,7 +272,7 @@ const Camera = forwardRef(function Camera(
                   key={d.deviceId}
                   onClick={() => { setDeviceId(d.deviceId); setIpMode(false); setShowSettings(false); }}
                   aria-label={`Select ${d.label || "Camera"}`}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors ${
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
                     !ipMode && deviceId === d.deviceId
                       ? "bg-indigo-600 text-white"
                       : "text-gray-300 hover:bg-gray-800"
@@ -286,7 +301,7 @@ const Camera = forwardRef(function Camera(
               <button
                 onClick={applyIpCamera}
                 aria-label="Connect to IP Camera"
-                className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1.5 rounded-lg transition-colors"
+                className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
                 Connect
               </button>
@@ -294,7 +309,7 @@ const Camera = forwardRef(function Camera(
                 <button
                   onClick={switchToWebcam}
                   aria-label="Switch back to Webcam"
-                  className="flex-1 text-xs btn-secondary py-1.5"
+                  className="flex-1 text-xs btn-secondary py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                 >
                   Use Webcam
                 </button>

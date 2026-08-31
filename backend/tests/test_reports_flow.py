@@ -48,3 +48,18 @@ def test_reports_rbac_and_exports(client, teacher_headers, student_headers, db_s
     res_teacher_excel = client.get(f"/reports/{session.id}/excel", headers=teacher_headers)
     assert res_teacher_excel.status_code == 200
     assert "spreadsheetml" in res_teacher_excel.headers.get("content-type", "")
+    assert "attendance_Compiler_Design_" in res_teacher_excel.headers.get("content-disposition", "")
+
+
+def test_email_report_rate_limiting(client, teacher_headers, db_session):
+    session = session_repo.create_session(db_session, subject="AI & ML", room="Room 101", teacher_id=1)
+
+    # First 5 email requests pass (or fail at SMTP send, returning 500/200 but not 429)
+    for _ in range(5):
+        res = client.post(f"/reports/{session.id}/email", json={"to": "principal@test.com"}, headers=teacher_headers)
+        assert res.status_code != 429
+
+    # 6th email request within 1 minute is rate-limited with HTTP 429
+    res_rate_limited = client.post(f"/reports/{session.id}/email", json={"to": "principal@test.com"}, headers=teacher_headers)
+    assert res_rate_limited.status_code == 429
+    assert "rate limit" in res_rate_limited.json()["detail"].lower()

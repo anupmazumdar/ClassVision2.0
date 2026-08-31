@@ -23,10 +23,7 @@ export function AuthProvider({ children }) {
     }
   });
 
-  const signIn = useCallback((userData, token) => {
-    if (token) {
-      sessionStorage.setItem("cv_token", token);
-    }
+  const signIn = useCallback((userData) => {
     sessionStorage.setItem("cv_user", JSON.stringify(userData));
     setUser(userData);
   }, []);
@@ -35,7 +32,6 @@ export function AuthProvider({ children }) {
     try {
       await logout();
     } catch (_) {}
-    sessionStorage.removeItem("cv_token");
     sessionStorage.removeItem("cv_user");
     setUser(null);
   }, []);

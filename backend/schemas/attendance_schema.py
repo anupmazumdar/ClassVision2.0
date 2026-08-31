@@ -23,10 +23,10 @@ class RecognizeRequest(BaseModel):
 class ScanAndMarkRequest(BaseModel):
     image: str = Field(..., max_length=MAX_IMAGE_BASE64_CHARS)
     frames: Optional[List[str]] = Field(default=None, max_length=5)
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    code: Optional[str] = None
-    device_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    lng: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    code: Optional[str] = Field(default=None, max_length=10)
+    device_id: Optional[str] = Field(default=None, max_length=255)
 
     @field_validator("frames", mode="after")
     @classmethod
@@ -40,12 +40,12 @@ class ScanAndMarkRequest(BaseModel):
 
 class MarkRequest(BaseModel):
     student_id: int
-    attendance_ticket: Optional[str] = None
+    attendance_ticket: Optional[str] = Field(default=None, max_length=500)
     confidence: float = 0.0
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    code: Optional[str] = None
-    device_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    lng: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    code: Optional[str] = Field(default=None, max_length=10)
+    device_id: Optional[str] = Field(default=None, max_length=255)
 
 
 class ManualMarkRequest(BaseModel):
@@ -56,9 +56,9 @@ class SelfCheckinRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6)
     image: Optional[str] = Field(default=None, max_length=MAX_IMAGE_BASE64_CHARS)
     frames: Optional[List[str]] = Field(default=None, max_length=5)
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    device_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    lng: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    device_id: Optional[str] = Field(default=None, max_length=255)
 
     @field_validator("frames", mode="after")
     @classmethod
