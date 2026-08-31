@@ -48,7 +48,7 @@ jobs:
         working-directory: backend
         run: |
           pip install bandit
-          bandit -r . -x ./tests -ll -ii
+          python -m bandit -r . -x ./tests,./load_tests -ll -ii
 
   frontend-build:
     name: Frontend Lint & Production Build

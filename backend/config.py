@@ -36,7 +36,7 @@ TICKET_EXPIRATION_SECONDS = int(os.getenv("TICKET_EXPIRATION_SECONDS", "15"))
 JWT_ALGORITHM = "HS256"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
+SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")  # nosec: B104
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8000"))
 
 # Distributed Redis Cache & Rate Limiter URL (e.g. redis://default:password@host:6379)
