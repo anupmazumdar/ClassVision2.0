@@ -2,15 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import * as api from "../api/client";
 
 export function useAuth() {
+  // Token and user state are stored in sessionStorage as an interim XSS mitigation
+  // (tokens are destroyed on tab close, avoiding persistent token harvesting).
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem("cv_user");
+      const stored = sessionStorage.getItem("cv_user");
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem("cv_token"));
+  const [token, setToken] = useState(() => sessionStorage.getItem("cv_token"));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -23,8 +25,8 @@ export function useAuth() {
         name: data.name,
         role: data.role,
       };
-      localStorage.setItem("cv_token", data.access_token);
-      localStorage.setItem("cv_user", JSON.stringify(userData));
+      sessionStorage.setItem("cv_token", data.access_token);
+      sessionStorage.setItem("cv_user", JSON.stringify(userData));
       setToken(data.access_token);
       setUser(userData);
       return data;
@@ -38,8 +40,8 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("cv_token");
-    localStorage.removeItem("cv_user");
+    sessionStorage.removeItem("cv_token");
+    sessionStorage.removeItem("cv_user");
     setToken(null);
     setUser(null);
   }, []);

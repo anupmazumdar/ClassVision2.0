@@ -56,13 +56,22 @@ export default function NavBar() {
         {/* Right side */}
         <div className="hidden md:flex items-center gap-3">
           <span className="text-xs text-gray-500">{user?.name}</span>
-          <button onClick={handleSignOut} className="btn-secondary text-sm py-1.5 flex items-center gap-1.5">
+          <button
+            onClick={handleSignOut}
+            aria-label="Sign out of ClassVision"
+            className="btn-secondary text-sm py-1.5 flex items-center gap-1.5"
+          >
             <LogOut size={14} /> Sign out
           </button>
         </div>
 
         {/* Mobile hamburger */}
-        <button className="md:hidden text-gray-400 hover:text-gray-100" onClick={() => setOpen(!open)}>
+        <button
+          className="md:hidden text-gray-400 hover:text-gray-100"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={open}
+        >
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
@@ -87,7 +96,11 @@ export default function NavBar() {
           ))}
           <div className="pt-2 border-t border-gray-800 flex items-center justify-between">
             <span className="text-xs text-gray-500">{user?.name}</span>
-            <button onClick={handleSignOut} className="text-sm text-red-400 flex items-center gap-1">
+            <button
+              onClick={handleSignOut}
+              aria-label="Sign out of ClassVision"
+              className="text-sm text-red-400 flex items-center gap-1"
+            >
               <LogOut size={14} /> Sign out
             </button>
           </div>

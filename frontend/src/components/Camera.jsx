@@ -6,6 +6,7 @@ import { Camera as CameraIcon, CameraOff, Wifi, ChevronDown } from "lucide-react
  *
  * Ref methods:
  *   capture()  — returns base64 JPEG string of current frame
+ *   captureSequence() - returns multiple burst frames for anti-spoof liveness check
  *   stop()     — stops camera stream
  */
 const Camera = forwardRef(function Camera(
@@ -33,7 +34,9 @@ const Camera = forwardRef(function Camera(
     navigator.mediaDevices?.enumerateDevices().then((devs) => {
       const cams = devs.filter((d) => d.kind === "videoinput");
       setDevices(cams);
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[Camera] Failed to enumerate media devices:", err);
+    });
   }, []);
 
   // Start/restart when deviceId changes
@@ -80,9 +83,22 @@ const Camera = forwardRef(function Camera(
       // Refresh device list with labels now that permission is granted
       navigator.mediaDevices.enumerateDevices().then((devs) => {
         setDevices(devs.filter((d) => d.kind === "videoinput"));
+      }).catch((err) => {
+        console.error("[Camera] Device enumeration refresh error:", err);
       });
-    } catch {
-      setError("Camera access denied or not available.");
+    } catch (err) {
+      console.error("[Camera] getUserMedia initialization failed:", err);
+      let message = "Unable to access camera. Please check your device and try again.";
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        message = "Camera permission denied. Please allow camera access in your browser settings and reload.";
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        message = "No camera found on this device.";
+      } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+        message = "Camera is already in use by another application.";
+      } else if (err.name === "OverconstrainedError" || err.name === "ConstraintNotSatisfiedError") {
+        message = "Camera constraints not satisfied. Please select another camera device.";
+      }
+      setError(message);
     }
   };
 
@@ -168,36 +184,48 @@ const Camera = forwardRef(function Camera(
         <img
           ref={imgRef}
           src={ipUrl}
-          alt="IP Camera"
+          alt="IP Camera Live Feed"
+          aria-label="IP Camera Live Feed"
           className="w-full h-full object-cover"
           onLoad={() => setReady(true)}
-          onError={() => setError("Cannot connect to IP camera. Check the URL.")}
+          onError={() => setError("Cannot connect to IP camera. Check the URL and network connection.")}
         />
       ) : (
         <video
           ref={videoRef}
-          autoPlay playsInline muted
+          autoPlay
+          playsInline
+          muted
+          aria-label="Live camera preview"
           className={`w-full h-full object-cover ${mirrored ? "scale-x-[-1]" : ""}`}
         />
       )}
 
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
       {/* Loading state */}
       {!ready && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-950" role="status" aria-live="polite">
           <CameraIcon size={32} className="text-gray-700 animate-pulse" />
+          <span className="sr-only">Initializing camera stream...</span>
         </div>
       )}
 
       {/* Error state */}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 px-4">
-          <CameraOff size={32} className="text-gray-500 mb-2" />
-          <p className="text-gray-400 text-sm text-center">{error}</p>
-          <button className="mt-3 text-xs text-indigo-400 hover:text-indigo-300 underline"
-            onClick={() => { setError(null); ipMode ? setIpMode(false) : startCamera(deviceId); }}>
-            Retry
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 px-6 py-4 text-center z-20"
+        >
+          <CameraOff size={36} className="text-red-400 mb-2.5" />
+          <p className="text-gray-200 text-sm font-medium leading-relaxed max-w-xs">{error}</p>
+          <button
+            className="mt-4 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-colors"
+            onClick={() => { setError(null); ipMode ? setIpMode(false) : startCamera(deviceId); }}
+            aria-label="Retry camera connection"
+          >
+            Retry Camera
           </button>
         </div>
       )}
@@ -205,7 +233,9 @@ const Camera = forwardRef(function Camera(
       {/* Settings button */}
       <button
         onClick={() => setShowSettings((s) => !s)}
-        className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-300 hover:text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition-colors"
+        aria-label="Camera Settings and Source Selector"
+        aria-expanded={showSettings}
+        className="absolute top-2 right-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-300 hover:text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition-colors z-30"
       >
         {ipMode ? <Wifi size={12} className="text-blue-400" /> : <CameraIcon size={12} />}
         {ipMode ? "IP Cam" : devices.find((d) => d.deviceId === deviceId)?.label?.split("(")[0]?.trim() || "Camera"}
@@ -214,7 +244,7 @@ const Camera = forwardRef(function Camera(
 
       {/* Settings dropdown */}
       {showSettings && (
-        <div className="absolute top-10 right-2 bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-64 p-3 space-y-3 z-10">
+        <div className="absolute top-10 right-2 bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-64 p-3 space-y-3 z-40">
           {/* Webcam selector */}
           <div>
             <p className="text-xs text-gray-500 font-medium mb-1.5 uppercase tracking-wider">Webcam</p>
@@ -226,6 +256,7 @@ const Camera = forwardRef(function Camera(
                 <button
                   key={d.deviceId}
                   onClick={() => { setDeviceId(d.deviceId); setIpMode(false); setShowSettings(false); }}
+                  aria-label={`Select ${d.label || "Camera"}`}
                   className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors ${
                     !ipMode && deviceId === d.deviceId
                       ? "bg-indigo-600 text-white"
@@ -240,23 +271,31 @@ const Camera = forwardRef(function Camera(
 
           {/* IP Camera */}
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-1.5 uppercase tracking-wider flex items-center gap-1">
+            <label htmlFor="ip-camera-input" className="text-xs text-gray-500 font-medium mb-1.5 uppercase tracking-wider flex items-center gap-1">
               <Wifi size={11} /> IP / Network Camera
-            </p>
+            </label>
             <input
+              id="ip-camera-input"
               className="input text-xs py-1.5"
               placeholder="http://192.168.1.x:8080/video"
+              aria-label="IP camera stream URL"
               value={ipInput}
               onChange={(e) => setIpInput(e.target.value)}
             />
             <div className="flex gap-2 mt-1.5">
-              <button onClick={applyIpCamera}
-                className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1.5 rounded-lg transition-colors">
+              <button
+                onClick={applyIpCamera}
+                aria-label="Connect to IP Camera"
+                className="flex-1 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1.5 rounded-lg transition-colors"
+              >
                 Connect
               </button>
               {ipMode && (
-                <button onClick={switchToWebcam}
-                  className="flex-1 text-xs btn-secondary py-1.5">
+                <button
+                  onClick={switchToWebcam}
+                  aria-label="Switch back to Webcam"
+                  className="flex-1 text-xs btn-secondary py-1.5"
+                >
                   Use Webcam
                 </button>
               )}

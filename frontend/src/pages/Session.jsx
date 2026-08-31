@@ -33,6 +33,7 @@ import {
   getSessionCode,
 } from "../api/client";
 import { getDeviceId } from "../utils/device";
+import { useToast } from "../context/ToastContext";
 
 function playSuccessChime() {
   try {
@@ -58,6 +59,7 @@ function playSuccessChime() {
 export default function Session() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const camRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -251,9 +253,12 @@ export default function Session() {
             marked_at: new Date().toISOString(),
           },
         }));
+        toast.success(`Marked ${student.name} present.`);
+      } else {
+        toast.info(`${student.name} is already marked present.`);
       }
     } catch (err) {
-      alert(err.response?.data?.detail || "Failed to mark attendance manually.");
+      toast.error(err.response?.data?.detail || "Failed to mark attendance manually.");
     } finally {
       setMarking(null);
     }
@@ -268,6 +273,9 @@ export default function Session() {
         delete next[studentId];
         return next;
       });
+      toast.info("Attendance entry removed.");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to remove attendance.");
     } finally {
       setMarking(null);
     }

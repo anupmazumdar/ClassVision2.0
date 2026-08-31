@@ -16,10 +16,12 @@ import {
 } from "lucide-react";
 import { getSessions, startSession, getStudents, deleteSession } from "../api/client";
 import { useAuth } from "../App";
+import { useToast } from "../context/ToastContext";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [sessions, setSessions] = useState([]);
   const [studentCount, setStudentCount] = useState(0);
@@ -28,11 +30,11 @@ export default function Dashboard() {
     show: false,
     subject: "",
     room: "",
-    require_code: false,
-    enable_geofence: false,
     room_lat: null,
     room_lng: null,
     radius_meters: 100,
+    enable_geofence: false,
+    require_code: true,
   });
   const [starting, setStarting] = useState(false);
 
@@ -56,9 +58,10 @@ export default function Dashboard() {
             room_lat: pos.coords.latitude,
             room_lng: pos.coords.longitude,
           }));
+          toast.info("GPS classroom coordinates captured.");
         },
         () => {
-          alert("Location access denied or unavailable.");
+          toast.error("Location access denied or unavailable.");
           setStartForm((prev) => ({ ...prev, enable_geofence: false }));
         },
         { enableHighAccuracy: true }
@@ -83,9 +86,10 @@ export default function Dashboard() {
         radius_meters: startForm.radius_meters || 100,
         require_code: startForm.require_code,
       });
+      toast.success("Session started successfully!");
       navigate(`/session/${session.id}`);
     } catch (err) {
-      alert(err.response?.data?.detail || "Failed to start session.");
+      toast.error(err.response?.data?.detail || "Failed to start session.");
       setStarting(false);
     }
   };

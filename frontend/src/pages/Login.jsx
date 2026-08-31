@@ -42,8 +42,9 @@ export default function Login() {
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Email</label>
+              <label htmlFor="login-email" className="label">Email</label>
               <input
+                id="login-email"
                 className="input"
                 type="email"
                 placeholder="teacher@school.edu"
@@ -51,11 +52,13 @@ export default function Login() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
                 autoComplete="username"
+                aria-required="true"
               />
             </div>
             <div>
-              <label className="label">Password</label>
+              <label htmlFor="login-password" className="label">Password</label>
               <input
+                id="login-password"
                 className="input"
                 type="password"
                 placeholder="••••••••"
@@ -63,17 +66,30 @@ export default function Login() {
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
                 autoComplete="current-password"
+                aria-required="true"
               />
             </div>
 
             {error && (
-              <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+              <p role="alert" className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
 
-            <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 py-2.5" disabled={loading}>
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in…</> : "Sign in"}
+            <button
+              type="submit"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
+              disabled={loading}
+              aria-label="Sign in to ClassVision"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" role="status" aria-live="polite" />
+                  <span>Signing in…</span>
+                </>
+              ) : (
+                "Sign in"
+              )}
             </button>
           </form>
 

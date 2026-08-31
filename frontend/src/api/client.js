@@ -5,8 +5,10 @@ const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 const client = axios.create({ baseURL: BASE_URL });
 
+// Token and user state are stored in sessionStorage as an interim XSS mitigation
+// (tokens are purged on tab close, avoiding persistent token harvesting).
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem("cv_token");
+  const token = sessionStorage.getItem("cv_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -15,8 +17,8 @@ client.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem("cv_token");
-      localStorage.removeItem("cv_user");
+      sessionStorage.removeItem("cv_token");
+      sessionStorage.removeItem("cv_user");
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -126,7 +128,7 @@ export const emailReport = (sessionId, to) =>
   client.post(`/reports/${sessionId}/email`, { to }).then((r) => r.data);
 
 export const downloadPdf = (sessionId) => {
-  const token = localStorage.getItem("cv_token");
+  const token = sessionStorage.getItem("cv_token");
   const url = `${BASE_URL}/reports/${sessionId}/pdf`;
   fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     .then((res) => res.blob())
@@ -142,7 +144,7 @@ export const downloadPdf = (sessionId) => {
 };
 
 export const downloadExcel = (sessionId) => {
-  const token = localStorage.getItem("cv_token");
+  const token = sessionStorage.getItem("cv_token");
   const url = `${BASE_URL}/reports/${sessionId}/excel`;
   const a = document.createElement("a");
   a.href = url;

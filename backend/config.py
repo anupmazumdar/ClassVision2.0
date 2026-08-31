@@ -1,5 +1,18 @@
 import os
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Explicitly resolve and load .env file from backend/ directory or root directory
+_backend_env = Path(__file__).resolve().parent / ".env"
+_root_env = Path(__file__).resolve().parent.parent / ".env"
+
+if _backend_env.exists():
+    load_dotenv(dotenv_path=_backend_env)
+elif _root_env.exists():
+    load_dotenv(dotenv_path=_root_env)
+else:
+    load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./classvision.db")
 
@@ -13,6 +26,9 @@ FACE_ENCRYPTION_KEY = os.getenv("FACE_ENCRYPTION_KEY", "")
 
 # Face Recognition Matching Threshold (Tuned for multi-angle registration: 0.75-0.85)
 FACE_SIMILARITY_THRESHOLD = float(os.getenv("FACE_SIMILARITY", "0.78"))
+
+# Max Allowed Base64 Payload Character Length (~5MB raw image -> ~6.7MB Base64)
+MAX_IMAGE_BASE64_CHARS = int(os.getenv("MAX_IMAGE_BASE64_CHARS", "7000000"))
 
 TOKEN_EXPIRE_HOURS = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
 JWT_ALGORITHM = "HS256"

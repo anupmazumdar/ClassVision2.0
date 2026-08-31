@@ -179,34 +179,39 @@ export default function RegisterStudent() {
         <div className="card">
           <form onSubmit={handleCreateStudent} className="space-y-4">
             {error && (
-              <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+              <p role="alert" className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
             <div>
-              <label className="label">Enrollment Number *</label>
+              <label htmlFor="student-enrollment" className="label">Enrollment Number *</label>
               <input
+                id="student-enrollment"
                 className="input"
                 placeholder="e.g. CS2024001"
                 value={form.enrollment}
                 onChange={(e) => setForm({ ...form, enrollment: e.target.value })}
                 required
                 autoFocus
+                aria-required="true"
               />
             </div>
             <div>
-              <label className="label">Full Name *</label>
+              <label htmlFor="student-name" className="label">Full Name *</label>
               <input
+                id="student-name"
                 className="input"
                 placeholder="e.g. Alex Johnson"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
+                aria-required="true"
               />
             </div>
             <div>
-              <label className="label">Department / Branch (optional)</label>
+              <label htmlFor="student-department" className="label">Department / Branch (optional)</label>
               <input
+                id="student-department"
                 className="input"
                 placeholder="e.g. Computer Science & Engineering"
                 value={form.department}
@@ -214,16 +219,31 @@ export default function RegisterStudent() {
               />
             </div>
             <div className="flex gap-3 pt-2">
-              <button type="button" className="btn-secondary flex-1" onClick={() => navigate("/students")}>
+              <button
+                type="button"
+                className="btn-secondary flex-1"
+                onClick={() => navigate("/students")}
+                aria-label="Cancel registration and return to students list"
+              >
                 Cancel
               </button>
               <button
                 type="submit"
                 className="btn-primary flex-1 flex items-center justify-center gap-2"
                 disabled={loading}
+                aria-label="Save student details and proceed to biometric capture"
               >
-                {loading ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
-                {loading ? "Creating Profile…" : "Next: Multi-Angle Capture"}
+                {loading ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" role="status" aria-live="polite" />
+                    <span>Creating…</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={15} />
+                    <span>Continue to Biometrics</span>
+                  </>
+                )}
               </button>
             </div>
           </form>

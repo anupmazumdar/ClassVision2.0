@@ -77,6 +77,27 @@ cd ClassVision2.0
 docker-compose up -d --build
 ```
 
+#### Reverse Proxy & Nginx Hardening
+When placing ClassVision behind Nginx or Traefik, configure appropriate body size limits and proxy headers:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.classvision.yourdomain.com;
+
+    # Protect against memory DoS from oversized multipart / base64 payloads
+    client_max_body_size 10M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
 ---
 
 ## ⚡ 3. Frontend Deployment (Vercel / Netlify)
