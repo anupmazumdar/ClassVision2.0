@@ -33,18 +33,26 @@ def test_login_invalid_password(client, db_session):
 
 
 def test_register_role_guarded(client, student_headers, admin_headers):
+    # Short password (< 8 chars) rejected by Pydantic schema validation
+    res_short = client.post(
+        "/auth/register",
+        json={"name": "New User", "email": "shortpass@test.com", "password": "pass", "role": "teacher"},
+        headers=admin_headers,
+    )
+    assert res_short.status_code == 422
+
     # Student role cannot register new users
     res_student = client.post(
         "/auth/register",
-        json={"name": "New User", "email": "newuser@test.com", "password": "pass", "role": "teacher"},
+        json={"name": "New User", "email": "newuser@test.com", "password": "password123", "role": "teacher"},
         headers=student_headers,
     )
     assert res_student.status_code == 403
 
-    # Admin role can register new users
+    # Admin role can register new users with valid password
     res_admin = client.post(
         "/auth/register",
-        json={"name": "New User", "email": "newuser_admin@test.com", "password": "pass", "role": "teacher"},
+        json={"name": "New User", "email": "newuser_admin@test.com", "password": "password123", "role": "teacher"},
         headers=admin_headers,
     )
     assert res_admin.status_code == 201

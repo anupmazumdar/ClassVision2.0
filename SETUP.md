@@ -26,10 +26,15 @@ cd backend
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment
+### 3. Configure environment & generate cryptographic secrets
+Generate fresh, cryptographically secure keys (including mandatory `FACE_ENCRYPTION_KEY`):
+```bash
+python scripts/generate_secrets.py
+```
+Copy the output or create `.env`:
 ```bash
 cp .env.example .env
-# Edit .env — change JWT_SECRET and ADMIN_PASSWORD
+# Edit .env and paste your generated FACE_ENCRYPTION_KEY, JWT_SECRET, and ADMIN_PASSWORD
 ```
 
 ### 4. Database Migrations (Alembic)

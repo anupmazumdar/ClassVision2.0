@@ -1,4 +1,7 @@
 import os
+
+os.environ.setdefault("FACE_ENCRYPTION_KEY", "E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

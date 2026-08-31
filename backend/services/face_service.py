@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+from fastapi import HTTPException
 from PIL import Image
 
 from config import FACE_SIMILARITY_THRESHOLD
@@ -13,13 +14,40 @@ _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalfac
 _FACE_SIZE = (64, 64)
 _HOG = cv2.HOGDescriptor(_FACE_SIZE, (16, 16), (8, 8), (8, 8), 9)
 
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5MB decoded limit
+MAX_B64_CHARS = 7 * 1024 * 1024    # ~7MB Base64 string limit
+
 
 def decode_image(b64: str) -> np.ndarray:
+    if not b64 or not isinstance(b64, str):
+        raise HTTPException(status_code=422, detail="Invalid image payload: string expected")
+
+    # Fast check: reject oversized Base64 payloads before decoding
+    if len(b64) > MAX_B64_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail="Payload Too Large: Base64 image payload exceeds 5MB limit.",
+        )
+
     if "," in b64:
         b64 = b64.split(",")[1]
-    img_bytes = base64.b64decode(b64)
-    pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    return np.array(pil_img)
+
+    try:
+        img_bytes = base64.b64decode(b64)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Malformed Base64 image data: {exc}")
+
+    if len(img_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Payload Too Large: Decoded image exceeds 5MB limit.",
+        )
+
+    try:
+        pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        return np.array(pil_img)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Failed to process image format: {exc}")
 
 
 def _hog_vec(gray_face: np.ndarray) -> np.ndarray:

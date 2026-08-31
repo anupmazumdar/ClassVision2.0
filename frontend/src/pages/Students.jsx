@@ -53,10 +53,15 @@ export default function Students() {
 
       {/* Search */}
       <div className="relative">
+        <label htmlFor="student-search-input" className="sr-only">
+          Search students by name, enrollment, or department
+        </label>
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
         <input
+          id="student-search-input"
           className="input pl-9"
           placeholder="Search by name, enrollment, or department…"
+          aria-label="Search students by name, enrollment, or department"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

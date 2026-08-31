@@ -45,9 +45,14 @@ def get_session_code(
 def stop_session(
     session_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_teacher_or_admin),
+    current: dict = Depends(require_teacher_or_admin),
 ):
-    return session_service.stop_session(db, session_id)
+    return session_service.stop_session(
+        db,
+        session_id,
+        current_user_id=int(current["sub"]),
+        current_user_role=current.get("role"),
+    )
 
 
 @router.get("/{session_id}")
@@ -63,6 +68,11 @@ def get_session(
 def delete_session(
     session_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_admin),
+    current: dict = Depends(require_teacher_or_admin),
 ):
-    session_service.delete_session(db, session_id)
+    session_service.delete_session(
+        db,
+        session_id,
+        current_user_id=int(current["sub"]),
+        current_user_role=current.get("role"),
+    )

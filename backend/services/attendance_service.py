@@ -117,6 +117,15 @@ def recognize_and_issue_tickets(
     device_id: Optional[str] = None,
 ) -> dict:
     """Runs liveness, recognizes faces, and generates signed attendance tickets for recognized faces."""
+    # Validate session if session_id is provided (> 0)
+    if session_id > 0:
+        session = session_repo.get_session_by_id(db, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if not session.is_active:
+            raise HTTPException(status_code=400, detail="Session is closed or not active")
+    # session_id == 0 is an intentional teacher/admin preview mode without an active session
+
     # 1. Anti-Spoofing Liveness check (Mandatory burst frames)
     if not frames or len(frames) < 2:
         raise HTTPException(

@@ -1,5 +1,8 @@
 import json
+import os
 from datetime import datetime
+
+os.environ.setdefault("FACE_ENCRYPTION_KEY", "E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=")
 import numpy as np
 from fastapi import HTTPException
 

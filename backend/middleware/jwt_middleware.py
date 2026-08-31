@@ -1,8 +1,8 @@
 import time
 from collections import defaultdict
 from datetime import timedelta
-from typing import Dict
-from fastapi import Depends, HTTPException, status
+from typing import Dict, Optional
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -19,6 +19,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 # In-memory sliding-window rate limiters
 _LOGIN_ATTEMPTS = defaultdict(list)
 _CODE_ATTEMPTS = defaultdict(list)
+
+
+def get_client_ip(request: Request) -> str:
+    """Extracts client IP, prioritizing X-Forwarded-For when deployed behind a reverse proxy (e.g. Nginx, Cloudflare, Traefik).
+
+    SECURITY NOTE:
+    In production environments, ensure that your edge reverse proxy or load balancer strips/overwrites
+    untrusted client-supplied X-Forwarded-For headers to prevent client IP spoofing attacks.
+    """
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        # First IP in comma-separated list is the client IP
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
 
 
 def hash_password(password: str) -> str:

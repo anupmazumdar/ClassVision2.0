@@ -10,8 +10,12 @@ router = APIRouter(prefix="/students", tags=["students"])
 
 
 @router.get("")
-def list_students(db: Session = Depends(get_db), _: dict = Depends(get_current_user)):
-    return student_service.list_students(db)
+def list_students(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    role = current_user.get("role", "student")
+    return student_service.list_students(db, caller_role=role)
 
 
 @router.post("", status_code=201)

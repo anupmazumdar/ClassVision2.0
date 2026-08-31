@@ -24,7 +24,15 @@ def test_hmac_ticket_attendance_flow(client, teacher_headers, student_headers, d
     code_info = session_service.get_current_session_code(session.id)
     current_code = code_info["code"]
 
-    # 1. Direct curl mark WITHOUT ticket -> HTTP 403 Security Violation
+    # 1A. Student role cannot access raw recognition endpoint (/attendance/recognize)
+    res_rec_stu = client.post(
+        "/attendance/recognize",
+        json={"image": "dummy", "frames": ["dummy", "dummy"], "session_id": session.id},
+        headers=student_headers,
+    )
+    assert res_rec_stu.status_code == 403
+
+    # 1B. Direct curl mark WITHOUT ticket -> HTTP 403 Security Violation
     res_direct = client.post(
         f"/attendance/{session.id}/mark",
         json={"student_id": student.id, "confidence": 98.0, "code": current_code},

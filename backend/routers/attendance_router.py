@@ -13,7 +13,7 @@ router = APIRouter(prefix="/attendance", tags=["attendance"])
 def recognize(
     body: RecognizeRequest,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(require_teacher_or_admin),
 ):
     if body.session_id:
         return attendance_service.recognize_and_issue_tickets(

@@ -61,7 +61,7 @@ def test_biometric_consent_and_encryption(client, teacher_headers, db_session):
     assert student.consent_given is True
     assert student.consent_at is not None
 
-    # Listing returns correct consent & face status
+    # Listing as Teacher returns full metadata
     res_list = client.get("/students", headers=teacher_headers)
     assert res_list.status_code == 200
     students_data = res_list.json()
@@ -69,3 +69,21 @@ def test_biometric_consent_and_encryption(client, teacher_headers, db_session):
     assert st_entry is not None
     assert st_entry["has_face"] is True
     assert st_entry["consent_given"] is True
+    assert "device_id" in st_entry
+
+    # 3. Listing as Student returns ONLY non-sensitive identity fields (consent/device_id omitted)
+    from middleware.jwt_middleware import create_token
+    from models import User
+    student_u = db_session.query(User).filter(User.role == "student").first()
+    if student_u:
+        stu_token = create_token(student_u.id, student_u.email, "student", student_u.name)
+        res_stu_list = client.get("/students", headers={"Authorization": f"Bearer {stu_token}"})
+        assert res_stu_list.status_code == 200
+        stu_data = res_stu_list.json()
+        target = next((s for s in stu_data if s["id"] == student.id), None)
+        assert target is not None
+        assert "consent_given" not in target
+        assert "consent_at" not in target
+        assert "device_id" not in target
+        assert "enrollment" in target
+        assert "name" in target

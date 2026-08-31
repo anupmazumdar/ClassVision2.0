@@ -40,6 +40,13 @@ def test_session_lifecycle_and_code(client, teacher_headers, student_headers):
     res_student_code = client.get(f"/sessions/{session_id}/code", headers=student_headers)
     assert res_student_code.status_code == 403
 
-    # Teacher stops session
+    # Foreign teacher cannot stop another teacher's session
+    from middleware.jwt_middleware import create_token
+    token_foreign_teacher = create_token(user_id=999, email="other_teacher@test.com", role="teacher", name="Other Teacher")
+    res_foreign_stop = client.put(f"/sessions/{session_id}/stop", headers={"Authorization": f"Bearer {token_foreign_teacher}"})
+    assert res_foreign_stop.status_code == 403
+    assert "permission" in res_foreign_stop.json()["detail"].lower()
+
+    # Original teacher stops session
     res_stop = client.put(f"/sessions/{session_id}/stop", headers=teacher_headers)
     assert res_stop.status_code == 200

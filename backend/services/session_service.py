@@ -99,10 +99,23 @@ def start_session(
     }
 
 
-def stop_session(db: Session, session_id: int) -> dict:
+def stop_session(
+    db: Session,
+    session_id: int,
+    current_user_id: Optional[int] = None,
+    current_user_role: Optional[str] = None,
+) -> dict:
     session = session_repo.get_session_by_id(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Ownership check: Teachers can only stop their own sessions; Admins can stop any session
+    if current_user_role == "teacher" and current_user_id is not None:
+        if session.teacher_id != current_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: You do not have permission to stop another teacher's session.",
+            )
 
     session_repo.stop_session(db, session)
     count = attendance_repo.count_by_session(db, session_id)
@@ -142,10 +155,23 @@ def get_session(db: Session, session_id: int) -> dict:
     }
 
 
-def delete_session(db: Session, session_id: int) -> None:
+def delete_session(
+    db: Session,
+    session_id: int,
+    current_user_id: Optional[int] = None,
+    current_user_role: Optional[str] = None,
+) -> None:
     session = session_repo.get_session_by_id(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Ownership check: Teachers can only delete their own sessions; Admins can delete any session
+    if current_user_role == "teacher" and current_user_id is not None:
+        if session.teacher_id != current_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: You do not have permission to delete another teacher's session.",
+            )
 
     attendance_repo.delete_by_session(db, session_id)
     session_repo.delete_session(db, session)

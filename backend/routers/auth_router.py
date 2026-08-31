@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from middleware.jwt_middleware import (
     check_login_rate_limit,
+    get_client_ip,
     get_current_user,
     record_failed_login,
     require_admin,
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     check_login_rate_limit(client_ip)
 
     try:

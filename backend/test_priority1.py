@@ -1,6 +1,9 @@
 import base64
 import json
+import os
 import time
+
+os.environ.setdefault("FACE_ENCRYPTION_KEY", "E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=")
 from unittest.mock import MagicMock, patch
 
 import cv2

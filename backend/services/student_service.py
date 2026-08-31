@@ -8,8 +8,21 @@ from repositories import student_repo
 from .face_service import decode_image, extract_encodings
 
 
-def list_students(db: Session) -> list[dict]:
+def list_students(db: Session, caller_role: str = "teacher") -> list[dict]:
     students = student_repo.list_students(db)
+    if caller_role == "student":
+        # Restrict sensitive biometric & consent audit metadata from general student view
+        return [
+            {
+                "id": s.id,
+                "enrollment": s.enrollment,
+                "name": s.name,
+                "department": s.department,
+            }
+            for s in students
+        ]
+
+    # Full administrative & biometric metadata for teachers and admins
     return [
         {
             "id": s.id,
