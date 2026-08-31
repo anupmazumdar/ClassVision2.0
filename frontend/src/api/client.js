@@ -210,3 +210,10 @@ export const updateMaterial = (materialId, data) =>
 
 export const deleteMaterial = (materialId) =>
   client.delete(`/materials/${materialId}`);
+
+export const askAssistant = (message, history = []) =>
+  client.post("/assistant/chat", { message, history }).then((r) => r.data);
+
+export const getAssistantFaqs = () =>
+  client.get("/assistant/faqs").then((r) => r.data);
+

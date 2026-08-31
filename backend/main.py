@@ -15,6 +15,7 @@ from config import (
 )
 from database import SessionLocal, init_db
 from routers import (
+    assistant_router,
     attendance_router,
     auth_router,
     material_router,
@@ -73,6 +74,7 @@ app.include_router(attendance_router)
 app.include_router(user_router)
 app.include_router(report_router)
 app.include_router(material_router)
+app.include_router(assistant_router)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+from .assistant_router import router as assistant_router
 from .attendance_router import router as attendance_router
 from .auth_router import router as auth_router
 from .material_router import router as material_router
@@ -14,4 +15,5 @@ __all__ = [
     "report_router",
     "user_router",
     "material_router",
+    "assistant_router",
 ]

@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 
 import NavBar from "./components/NavBar";
 import InstallPrompt from "./components/InstallPrompt";
+import ChatAssistant from "./components/ChatAssistant";
 import { ToastProvider } from "./context/ToastContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -114,6 +115,7 @@ export default function App() {
               </Routes>
             </Suspense>
             <InstallPrompt />
+            <ChatAssistant />
           </BrowserRouter>
         </ToastProvider>
       </AuthProvider>
