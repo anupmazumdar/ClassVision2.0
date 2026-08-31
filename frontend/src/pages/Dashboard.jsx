@@ -15,7 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { getSessions, startSession, getStudents, deleteSession } from "../api/client";
-import { useAuth } from "../App";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
 export default function Dashboard() {

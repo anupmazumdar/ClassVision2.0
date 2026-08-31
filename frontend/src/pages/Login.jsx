@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GraduationCap, Loader2 } from "lucide-react";
 import { login } from "../api/client";
-import { useAuth } from "../App";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const { signIn } = useAuth();

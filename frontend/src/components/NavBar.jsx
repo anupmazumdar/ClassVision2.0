@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../App";
+import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, Video, FileText,
   LogOut, Menu, X, GraduationCap, UserCog,

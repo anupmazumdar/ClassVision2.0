@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserPlus, Search, CheckCircle, AlertCircle, Trash2, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { getStudents, deleteStudent } from "../api/client";
-import { useAuth } from "../App";
+import { useAuth } from "../context/AuthContext";
 
 export default function Students() {
   const navigate = useNavigate();
