@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import User
@@ -8,7 +9,10 @@ def count_users(db: Session) -> int:
 
 
 def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
+    if not email:
+        return None
+    cleaned = email.strip().lower()
+    return db.query(User).filter(func.lower(User.email) == cleaned).first()
 
 
 def list_users(db: Session):
@@ -16,7 +20,7 @@ def list_users(db: Session):
 
 
 def create_user(db: Session, *, name: str, email: str, password_hash: str, role: str):
-    user = User(name=name, email=email, password_hash=password_hash, role=role)
+    user = User(name=name, email=email.strip().lower(), password_hash=password_hash, role=role)
     db.add(user)
     db.commit()
     db.refresh(user)

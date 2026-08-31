@@ -15,9 +15,10 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const cleanedEmail = form.email.trim();
     try {
-      const data = await login(form.email, form.password);
-      signIn({ name: data.name, role: data.role, email: form.email }, data.access_token);
+      const data = await login(cleanedEmail, form.password);
+      signIn({ name: data.name, role: data.role, email: cleanedEmail }, data.access_token);
       navigate("/");
     } catch (err) {
       setError(getErrorMessage(err, "Login failed. Check your credentials."));
@@ -52,6 +53,9 @@ export default function Login() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
                 aria-required="true"
               />
             </div>

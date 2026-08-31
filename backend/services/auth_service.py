@@ -6,7 +6,8 @@ from repositories import user_repo
 
 
 def login(db: Session, email: str, password: str) -> dict:
-    user = user_repo.get_user_by_email(db, email)
+    cleaned_email = email.strip().lower() if email else ""
+    user = user_repo.get_user_by_email(db, cleaned_email)
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -20,14 +21,15 @@ def login(db: Session, email: str, password: str) -> dict:
 
 
 def register(db: Session, name: str, email: str, password: str, role: str) -> dict:
-    existing = user_repo.get_user_by_email(db, email)
+    cleaned_email = email.strip().lower() if email else ""
+    existing = user_repo.get_user_by_email(db, cleaned_email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = user_repo.create_user(
         db,
-        name=name,
-        email=email,
+        name=name.strip(),
+        email=cleaned_email,
         password_hash=hash_password(password),
         role=role,
     )
@@ -35,23 +37,24 @@ def register(db: Session, name: str, email: str, password: str, role: str) -> di
 
 
 def seed_default_admin(db: Session, *, name: str, email: str, password: str) -> None:
-    if user_repo.count_users(db) > 0:
-        return
+    cleaned_email = email.strip().lower()
+    admin = user_repo.get_user_by_email(db, cleaned_email)
+    if not admin:
+        user_repo.create_user(
+            db,
+            name=name,
+            email=cleaned_email,
+            password_hash=hash_password(password),
+            role="admin",
+        )
 
-    # Seed default Admin
-    user_repo.create_user(
-        db,
-        name=name,
-        email=email,
-        password_hash=hash_password(password),
-        role="admin",
-    )
-
-    # Seed default Demo Student
-    user_repo.create_user(
-        db,
-        name="Demo Student",
-        email="student@classvision.local",
-        password_hash=hash_password("student123"),
-        role="student",
-    )
+    # Also seed alias with double-s 'classvission' so custom domain typos don't fail
+    alt_email = "admin@classvission.local"
+    if cleaned_email != alt_email and not user_repo.get_user_by_email(db, alt_email):
+        user_repo.create_user(
+            db,
+            name=name,
+            email=alt_email,
+            password_hash=hash_password(password),
+            role="admin",
+        )
