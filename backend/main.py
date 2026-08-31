@@ -46,13 +46,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ClassVision API", version="2.0.0", lifespan=lifespan)
 
-# Tighten CORS in production, allow development origins locally
-cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173")
-allowed_origins = cors_env.split(",") if ENVIRONMENT.lower() == "production" else ["*"]
+# CORS configuration supporting custom domains, Vercel deployments, and localhost
+cors_env = os.getenv("CORS_ORIGINS", "")
+explicit_origins = [o.strip() for o in cors_env.split(",") if o.strip() and o.strip() != "*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=explicit_origins if explicit_origins else ["*"] if ENVIRONMENT.lower() != "production" else [],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
