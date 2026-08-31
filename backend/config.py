@@ -39,8 +39,11 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8000"))
 
-# Optional Distributed Redis Cache & Rate Limiter URL (e.g. redis://default:password@host:6379)
+# Distributed Redis Cache & Rate Limiter URL (e.g. redis://default:password@host:6379)
 REDIS_URL = os.getenv("REDIS_URL", "")
+
+# Reverse Proxy IP Header Trust (Only enable if deployed behind a verified trusted reverse proxy)
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").lower() in ("true", "1")
 
 DEFAULT_ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 DEFAULT_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@classvision.local")
@@ -48,9 +51,11 @@ DEFAULT_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 ADMIN_ALIAS_EMAIL = os.getenv("ADMIN_ALIAS_EMAIL", "")
 
 # CORS Origin Allow-list
-CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "")
-ALLOWED_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip() and o.strip() != "*"]
-if not ALLOWED_ORIGINS and ENVIRONMENT.lower() != "production":
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
+if CORS_ORIGINS:
+    ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+else:
+    # Explicit localhost origins for development and local testing
     ALLOWED_ORIGINS = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -65,6 +70,7 @@ def check_security_config():
     """Validates configuration at startup and warns if default/insecure secrets are in use.
 
     Fail-fast immediately on missing or invalid FACE_ENCRYPTION_KEY in any environment.
+    In production: enforces explicit secrets, mandatory Redis, secure admin credentials, and CORS allow-list.
     """
     # 1. Biometric encryption key is strictly mandatory in all environments
     if not FACE_ENCRYPTION_KEY or not FACE_ENCRYPTION_KEY.strip():
@@ -94,6 +100,16 @@ def check_security_config():
                 "CRITICAL SECURITY ERROR: CORS_ORIGINS environment variable is empty in production! "
                 "Specify explicit allowed domain origins (e.g. CORS_ORIGINS=https://classvission.anupmazumdar.me)."
             )
+        if not REDIS_URL or not REDIS_URL.strip():
+            raise RuntimeError(
+                "CRITICAL SECURITY ERROR: REDIS_URL is mandatory in production for distributed multi-instance "
+                "rate limiting and token revocation! Configure REDIS_URL in environment variables."
+            )
+        if DEFAULT_ADMIN_PASSWORD == "admin123" or len(DEFAULT_ADMIN_PASSWORD) < 12:
+            raise RuntimeError(
+                "CRITICAL SECURITY ERROR: Default or weak DEFAULT_ADMIN_PASSWORD ('admin123') detected in production! "
+                "Set ADMIN_PASSWORD to a secure passphrase (minimum 12 characters)."
+            )
     else:
         if "change-this" in JWT_SECRET:
             logging.warning("[SECURITY WARNING] Running with default development JWT_SECRET. Set JWT_SECRET in .env for production.")
@@ -101,3 +117,5 @@ def check_security_config():
             logging.warning("[SECURITY WARNING] Running with default development SESSION_CODE_SECRET. Demo-only — do not use with real student data.")
         if "cv-attendance-ticket" in ATTENDANCE_TICKET_SECRET:
             logging.warning("[SECURITY WARNING] Running with default development ATTENDANCE_TICKET_SECRET. Demo-only — do not use with real student data.")
+        if DEFAULT_ADMIN_PASSWORD == "admin123":
+            logging.warning("[SECURITY WARNING] Running with default ADMIN_PASSWORD ('admin123'). Override in .env for production.")

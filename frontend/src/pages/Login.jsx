@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { GraduationCap, Loader2, QrCode, Smartphone, ShieldCheck, Lock, UserCheck, AlertTriangle } from "lucide-react";
 import { login, studentLogin, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import RateLimitCooldown from "../components/RateLimitCooldown";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -14,10 +15,12 @@ export default function Login() {
   const [studentPin, setStudentPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [rateLimited, setRateLimited] = useState(false);
 
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setRateLimited(false);
     setLoading(true);
     const cleanedEmail = teacherForm.email.trim();
     try {
@@ -25,6 +28,9 @@ export default function Login() {
       signIn({ name: data.name, role: data.role, email: cleanedEmail }, data.access_token);
       navigate("/");
     } catch (err) {
+      if (err.response?.status === 429) {
+        setRateLimited(true);
+      }
       setError(getErrorMessage(err, "Login failed. Check your email and password."));
     } finally {
       setLoading(false);
@@ -34,6 +40,7 @@ export default function Login() {
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setRateLimited(false);
     setLoading(true);
     const cleanEnrollment = studentEnrollment.trim();
     const cleanPin = studentPin.trim();
@@ -59,6 +66,9 @@ export default function Login() {
       );
       navigate("/classroom");
     } catch (err) {
+      if (err.response?.status === 429) {
+        setRateLimited(true);
+      }
       setError(getErrorMessage(err, "Student login failed. Verify enrollment, PIN or device approval."));
     } finally {
       setLoading(false);
@@ -150,17 +160,27 @@ export default function Login() {
                 />
               </div>
 
-              {error && (
+              {rateLimited ? (
+                <RateLimitCooldown
+                  cooldownSeconds={60}
+                  onRetry={() => {
+                    setRateLimited(false);
+                    setError("");
+                  }}
+                  title="Too Many Login Attempts"
+                  description="Security lock active. Please wait for the cooldown timer to finish before re-attempting authentication."
+                />
+              ) : error ? (
                 <div role="alert" className="text-red-400 text-xs bg-red-950/50 border border-red-800 p-2.5 rounded-lg flex items-start gap-2">
                   <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
-              )}
+              ) : null}
 
               <button
                 type="submit"
                 className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
-                disabled={loading}
+                disabled={loading || rateLimited}
               >
                 {loading ? (
                   <>
@@ -236,7 +256,17 @@ export default function Login() {
                 />
               </div>
 
-              {error && (
+              {rateLimited ? (
+                <RateLimitCooldown
+                  cooldownSeconds={60}
+                  onRetry={() => {
+                    setRateLimited(false);
+                    setError("");
+                  }}
+                  title="Too Many Student Login Attempts"
+                  description="Security lock active on this device. Please wait for the cooldown timer before retrying."
+                />
+              ) : error ? (
                 <div
                   role="alert"
                   className={`text-xs p-3 rounded-lg flex items-start gap-2 ${
@@ -255,12 +285,12 @@ export default function Login() {
                     )}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <button
                 type="submit"
                 className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 shadow-lg shadow-indigo-900/30"
-                disabled={loading}
+                disabled={loading || rateLimited}
               >
                 {loading ? (
                   <>

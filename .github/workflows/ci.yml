@@ -44,6 +44,12 @@ jobs:
         run: |
           pytest test_priority1.py test_priority2.py tests/ -v
 
+      - name: Run Bandit Static Security Analysis
+        working-directory: backend
+        run: |
+          pip install bandit
+          bandit -r . -x ./tests -ll -ii
+
   frontend-build:
     name: Frontend Lint & Production Build
     runs-on: ubuntu-latest
@@ -62,6 +68,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Run npm audit check
+        working-directory: frontend
+        run: npm audit --audit-level=high
 
       - name: Build frontend
         working-directory: frontend

@@ -6,6 +6,7 @@ from .jwt_middleware import (
     require_admin,
     verify_password,
 )
+from .security_headers import SecurityHeadersMiddleware
 
 __all__ = [
     "create_token",
@@ -14,4 +15,5 @@ __all__ = [
     "require_admin",
     "hash_password",
     "verify_password",
+    "SecurityHeadersMiddleware",
 ]

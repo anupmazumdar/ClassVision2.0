@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
-from config import ENVIRONMENT
+from config import ENVIRONMENT, TOKEN_EXPIRE_HOURS
 from database import get_db
 from middleware.jwt_middleware import (
     check_login_rate_limit,
@@ -24,14 +24,14 @@ def _is_secure_cookie() -> bool:
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
-    """Sets a secure, httpOnly JWT cookie with 7-day expiration."""
+    """Sets a secure, httpOnly JWT cookie whose max_age strictly aligns with JWT lifetime."""
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         secure=_is_secure_cookie(),
         samesite="lax",
-        max_age=86400 * 7,
+        max_age=int(TOKEN_EXPIRE_HOURS * 3600),
         path="/",
     )
 

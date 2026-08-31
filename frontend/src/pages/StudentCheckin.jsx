@@ -18,6 +18,8 @@ import Camera from "../components/Camera";
 import { selfCheckin, getErrorMessage } from "../api/client";
 import { getDeviceId } from "../utils/device";
 
+import RateLimitCooldown from "../components/RateLimitCooldown";
+
 export default function StudentCheckin() {
   const camRef = useRef(null);
 
@@ -26,15 +28,23 @@ export default function StudentCheckin() {
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState("");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [reconnecting, setReconnecting] = useState(false);
 
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState("");
+  const [rateLimited, setRateLimited] = useState(false);
   const [successData, setSuccessData] = useState(null);
 
   // Monitor network online/offline status
   useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
+    const onOnline = () => {
+      setIsOnline(true);
+      setReconnecting(false);
+    };
+    const onOffline = () => {
+      setIsOnline(false);
+      setReconnecting(true);
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     return () => {
@@ -79,6 +89,7 @@ export default function StudentCheckin() {
   const handleSelfCheckin = async (e) => {
     e.preventDefault();
     setError("");
+    setRateLimited(false);
 
     if (!code || code.trim().length !== 6) {
       setError("Please enter the 6-digit session code displayed on the classroom screen.");
@@ -88,6 +99,12 @@ export default function StudentCheckin() {
     if (!location) {
       setError("GPS location is required. Please allow location access and retry.");
       fetchLocation();
+      return;
+    }
+
+    if (!navigator.onLine) {
+      setReconnecting(true);
+      setError("Network offline. Reconnecting to server… please wait.");
       return;
     }
 
@@ -119,6 +136,11 @@ export default function StudentCheckin() {
       setSuccessData(res);
       camRef.current?.stop();
     } catch (err) {
+      if (err.response?.status === 429) {
+        setRateLimited(true);
+      } else if (!err.response || err.code === "ERR_NETWORK") {
+        setReconnecting(true);
+      }
       setError(getErrorMessage(err, "Self check-in failed. Please try again.", "student"));
     } finally {
       setCheckingIn(false);
@@ -128,6 +150,7 @@ export default function StudentCheckin() {
   const resetForm = () => {
     setCode("");
     setError("");
+    setRateLimited(false);
     setSuccessData(null);
     fetchLocation();
   };
@@ -299,18 +322,36 @@ export default function StudentCheckin() {
               )}
             </div>
 
-            {/* Error Message Box */}
-            {(error || locError) && (
+            {/* Reconnecting Status Banner */}
+            {reconnecting && (
+              <div role="status" className="p-3 bg-indigo-950/80 border border-indigo-700/80 rounded-xl text-indigo-200 text-xs flex items-center gap-2 animate-pulse">
+                <Loader2 size={15} className="animate-spin text-indigo-400 shrink-0" />
+                <span>Reconnecting to attendance server… check your internet connection.</span>
+              </div>
+            )}
+
+            {/* Error Message Box / Rate Limit Cooldown */}
+            {rateLimited ? (
+              <RateLimitCooldown
+                cooldownSeconds={60}
+                onRetry={() => {
+                  setRateLimited(false);
+                  setError("");
+                }}
+                title="Face Verification Rate Limited"
+                description="High compute frequency detected. Please wait for the cooldown timer before submitting another facial check-in."
+              />
+            ) : (error || locError) ? (
               <div role="alert" className="p-3 rounded-xl bg-red-950/60 border border-red-800/80 text-red-300 text-xs flex items-start gap-2">
                 <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
                 <p className="leading-snug">{error || locError}</p>
               </div>
-            )}
+            ) : null}
 
             {/* Submit Check-in Button */}
             <button
               type="submit"
-              disabled={checkingIn || code.length !== 6}
+              disabled={checkingIn || code.length !== 6 || rateLimited}
               className="btn-primary w-full py-3 text-base flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {checkingIn ? (

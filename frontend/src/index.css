@@ -76,3 +76,25 @@
 .animate-shake {
   animation: shake 0.4s ease-in-out;
 }
+
+/* High-Contrast Wall Kiosk Display Mode */
+html.high-contrast body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+html.high-contrast .card {
+  background-color: #080808 !important;
+  border: 2px solid #52525b !important;
+}
+
+html.high-contrast .input {
+  background-color: #000000 !important;
+  border: 2px solid #71717a !important;
+  color: #ffffff !important;
+}
+
+html.high-contrast header {
+  background-color: #000000 !important;
+  border-bottom: 2px solid #52525b !important;
+}

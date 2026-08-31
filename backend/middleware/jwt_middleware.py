@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from config import JWT_ALGORITHM, JWT_SECRET, TOKEN_EXPIRE_HOURS, REDIS_URL
+from config import JWT_ALGORITHM, JWT_SECRET, TOKEN_EXPIRE_HOURS, REDIS_URL, TRUST_PROXY_HEADERS
 from utils.time import utc_now
 
 SECRET_KEY = JWT_SECRET
@@ -41,16 +41,17 @@ _REVOKED_TOKENS = set()
 
 
 def get_client_ip(request: Request) -> str:
-    """Extracts client IP, prioritizing X-Forwarded-For when deployed behind a reverse proxy (e.g. Nginx, Cloudflare, Traefik).
+    """Extracts client IP safely.
 
-    SECURITY NOTE:
-    In production environments, ensure that your edge reverse proxy or load balancer strips/overwrites
-    untrusted client-supplied X-Forwarded-For headers to prevent client IP spoofing attacks.
+    When TRUST_PROXY_HEADERS is explicitly True (configured behind a verified reverse proxy),
+    parses the leading address in X-Forwarded-For. Otherwise, strictly uses direct connection
+    remote host (request.client.host) to block spoofed proxy header attacks.
     """
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        # First IP in comma-separated list is the client IP
-        return forwarded.split(",")[0].strip()
+    if TRUST_PROXY_HEADERS:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            # First IP in comma-separated list is client IP
+            return forwarded.split(",")[0].strip()
     if request.client and request.client.host:
         return request.client.host
     return "unknown"

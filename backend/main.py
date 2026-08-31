@@ -27,7 +27,14 @@ from routers import (
     student_router,
     user_router,
 )
+import logging
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from middleware.security_headers import SecurityHeadersMiddleware
 from services import auth_service
+
+logger = logging.getLogger("classvision.api")
 
 
 @asynccontextmanager
@@ -52,6 +59,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ClassVision API", version="2.0.0", lifespan=lifespan)
 
+# Add OWASP standard security response headers
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Environment-driven explicit CORS origin configuration with credential support
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +70,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches unhandled exceptions, logs full traceback server-side, and returns a sanitized generic 500 JSON response."""
+    logger.exception("Unhandled server error on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected internal server error occurred. A diagnostic report has been logged."},
+    )
 
 
 @app.get("/")
