@@ -312,7 +312,7 @@ export default function Login() {
               <span className="font-semibold text-gray-300">Default Admin Credentials:</span>
               <div className="flex items-center justify-between font-mono text-[11px] text-indigo-300">
                 <span>admin@classvision.local</span>
-                <span className="text-gray-400">Password: <strong className="text-indigo-300">admin123</strong></span>
+                <span className="text-gray-400">Password: <strong className="text-indigo-300">Anup1202500</strong></span>
               </div>
             </div>
 

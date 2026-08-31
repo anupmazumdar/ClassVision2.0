@@ -213,16 +213,24 @@ def seed_default_admin(
             password_hash=hash_password(password),
             role="admin",
         )
+    else:
+        admin.password_hash = hash_password(password)
+        db.commit()
 
     # Only seed alias if explicitly configured via optional environment opt-in
     if alias_email and alias_email.strip():
         cleaned_alias = alias_email.strip().lower()
-        if cleaned_email != cleaned_alias and not user_repo.get_user_by_email(db, cleaned_alias):
-            user_repo.create_user(
-                db,
-                name=name,
-                email=cleaned_alias,
-                password_hash=hash_password(password),
-                role="admin",
-            )
+        if cleaned_email != cleaned_alias:
+            alias_admin = user_repo.get_user_by_email(db, cleaned_alias)
+            if not alias_admin:
+                user_repo.create_user(
+                    db,
+                    name=name,
+                    email=cleaned_alias,
+                    password_hash=hash_password(password),
+                    role="admin",
+                )
+            else:
+                alias_admin.password_hash = hash_password(password)
+                db.commit()
 
