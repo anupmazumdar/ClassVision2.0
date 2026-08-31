@@ -5,6 +5,25 @@ const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 const client = axios.create({ baseURL: BASE_URL });
 
+export function getErrorMessage(err, fallback = "An error occurred. Please try again.") {
+  if (!err) return fallback;
+  const detail = err.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item?.msg) return item.msg;
+        return JSON.stringify(item);
+      })
+      .join("; ");
+  }
+  if (detail && typeof detail === "object") {
+    return detail.msg || JSON.stringify(detail);
+  }
+  return err.message || fallback;
+}
+
 // Token and user state are stored in sessionStorage as an interim XSS mitigation
 // (tokens are purged on tab close, avoiding persistent token harvesting).
 client.interceptors.request.use((config) => {
@@ -19,7 +38,9 @@ client.interceptors.response.use(
     if (err.response?.status === 401) {
       sessionStorage.removeItem("cv_token");
       sessionStorage.removeItem("cv_user");
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(err);
   }

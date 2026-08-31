@@ -6,7 +6,15 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import { getSessions, getSession, downloadExcel, downloadPdf, getStudentSummary, emailReport } from "../api/client";
+import {
+  getSessions,
+  getSession,
+  downloadExcel,
+  downloadPdf,
+  getStudentSummary,
+  emailReport,
+  getErrorMessage,
+} from "../api/client";
 
 export default function Reports() {
   const [tab, setTab] = useState("sessions"); // sessions | chart
@@ -66,7 +74,7 @@ export default function Reports() {
       setEmailMsg(res.message);
       setTimeout(() => setEmailModal(false), 2000);
     } catch (err) {
-      setEmailMsg(err.response?.data?.detail || "Failed to send email.");
+      setEmailMsg(getErrorMessage(err, "Failed to send email."));
     } finally {
       setEmailSending(false);
     }

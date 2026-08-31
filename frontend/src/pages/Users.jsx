@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { UserCog, UserPlus, Trash2, Loader2, Shield, BookOpen } from "lucide-react";
-import { getUsers, registerUser, deleteUser } from "../api/client";
+import { getUsers, registerUser, deleteUser, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -18,13 +18,17 @@ export default function Users() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user?.role !== "admin") { navigate("/"); return; }
+    if (user && user.role !== "admin") {
+      navigate("/");
+      return;
+    }
     load();
-  }, []);
+  }, [user]);
 
   const load = () => {
-    setLoading(true);
-    getUsers().then(setUsers).finally(() => setLoading(false));
+    getUsers()
+      .then(setUsers)
+      .finally(() => setLoading(false));
   };
 
   const handleAdd = async (e) => {
@@ -37,7 +41,7 @@ export default function Users() {
       setForm(EMPTY_FORM);
       load();
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to register user.");
+      setError(getErrorMessage(err, "Failed to register user."));
     } finally {
       setSaving(false);
     }

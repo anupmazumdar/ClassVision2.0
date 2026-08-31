@@ -31,6 +31,7 @@ import {
   downloadExcel,
   getStudents,
   getSessionCode,
+  getErrorMessage,
 } from "../api/client";
 import { getDeviceId } from "../utils/device";
 import { useToast } from "../context/ToastContext";
@@ -198,7 +199,7 @@ export default function Session() {
         }
       }
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Recognition scan failed.";
+      const errorMsg = getErrorMessage(err, "Recognition scan failed.");
       if (
         errorMsg.includes("Anti-Spoofing") ||
         errorMsg.includes("Geofence") ||
@@ -258,7 +259,7 @@ export default function Session() {
         toast.info(`${student.name} is already marked present.`);
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to mark attendance manually.");
+      toast.error(getErrorMessage(err, "Failed to mark attendance manually."));
     } finally {
       setMarking(null);
     }
@@ -275,7 +276,7 @@ export default function Session() {
       });
       toast.info("Attendance entry removed.");
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to remove attendance.");
+      toast.error(getErrorMessage(err, "Failed to remove attendance."));
     } finally {
       setMarking(null);
     }

@@ -14,7 +14,7 @@ import {
   MapPin,
   ShieldCheck,
 } from "lucide-react";
-import { getSessions, startSession, getStudents, deleteSession } from "../api/client";
+import { getSessions, startSession, getStudents, deleteSession, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -89,7 +89,7 @@ export default function Dashboard() {
       toast.success("Session started successfully!");
       navigate(`/session/${session.id}`);
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to start session.");
+      toast.error(getErrorMessage(err, "Failed to start session."));
       setStarting(false);
     }
   };

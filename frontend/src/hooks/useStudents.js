@@ -14,7 +14,7 @@ export function useStudents() {
       setStudents(data);
       return data;
     } catch (err) {
-      const msg = err.response?.data?.detail || "Failed to fetch students";
+      const msg = api.getErrorMessage(err, "Failed to fetch students");
       setError(msg);
     } finally {
       setLoading(false);
@@ -29,7 +29,7 @@ export function useStudents() {
       await fetchStudents();
       return created;
     } catch (err) {
-      const msg = err.response?.data?.detail || "Failed to create student";
+      const msg = api.getErrorMessage(err, "Failed to create student");
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -44,7 +44,7 @@ export function useStudents() {
       await api.deleteStudent(studentId);
       setStudents((prev) => prev.filter((s) => s.id !== studentId));
     } catch (err) {
-      const msg = err.response?.data?.detail || "Failed to delete student";
+      const msg = api.getErrorMessage(err, "Failed to delete student");
       setError(msg);
       throw new Error(msg);
     } finally {
@@ -60,7 +60,7 @@ export function useStudents() {
       await fetchStudents();
       return res;
     } catch (err) {
-      const msg = err.response?.data?.detail || "Failed to register face";
+      const msg = api.getErrorMessage(err, "Failed to register face");
       setError(msg);
       throw new Error(msg);
     } finally {

@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Camera from "../components/Camera";
-import { createStudent, registerFace } from "../api/client";
+import { createStudent, registerFace, getErrorMessage } from "../api/client";
 
 const CAPTURE_GUIDELINES = [
   {
@@ -82,7 +82,7 @@ export default function RegisterStudent() {
       setStudent(s);
       setStep("photos");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to create student.");
+      setError(getErrorMessage(err, "Failed to create student."));
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function RegisterStudent() {
       camRef.current?.stop();
       setStep("done");
     } catch (err) {
-      setFeedback(err.response?.data?.detail || "Face registration failed. Ensure face is clear and well-lit.");
+      setFeedback(getErrorMessage(err, "Face registration failed. Ensure face is clear and well-lit."));
     } finally {
       setLoading(false);
     }

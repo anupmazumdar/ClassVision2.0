@@ -31,7 +31,7 @@ export function useAuth() {
       setUser(userData);
       return data;
     } catch (err) {
-      const msg = err.response?.data?.detail || "Invalid login credentials";
+      const msg = api.getErrorMessage(err, "Invalid login credentials");
       setError(msg);
       throw new Error(msg);
     } finally {

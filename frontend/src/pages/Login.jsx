@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GraduationCap, Loader2 } from "lucide-react";
-import { login } from "../api/client";
+import { login, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -20,7 +20,7 @@ export default function Login() {
       signIn({ name: data.name, role: data.role, email: form.email }, data.access_token);
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.detail || "Login failed. Check your credentials.");
+      setError(getErrorMessage(err, "Login failed. Check your credentials."));
     } finally {
       setLoading(false);
     }
