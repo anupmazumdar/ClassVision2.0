@@ -60,8 +60,18 @@ export default function RegisterStudent() {
   const navigate = useNavigate();
   const camRef = useRef(null);
 
+  const currentCalYear = new Date().getFullYear();
+
   const [step, setStep] = useState("info"); // info | photos | done
-  const [form, setForm] = useState({ enrollment: "", name: "", department: "" });
+  const [form, setForm] = useState({
+    enrollment: "",
+    name: "",
+    course: "B.Tech",
+    branch: "Computer Science & Engineering (CSE)",
+    year: 1,
+    semester: 1,
+    admission_year: currentCalYear,
+  });
   const [student, setStudent] = useState(null);
   const [photos, setPhotos] = useState([]); // array of { frame: base64, angle: tag }
   const [currentAngleIdx, setCurrentAngleIdx] = useState(0);
@@ -76,9 +86,30 @@ export default function RegisterStudent() {
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!form.name.trim()) {
+      setError("Student Name is mandatory.");
+      return;
+    }
+    if (!form.enrollment.trim()) {
+      setError("Enrollment / Roll Number is mandatory.");
+      return;
+    }
+    if (!form.branch.trim()) {
+      setError("Branch / Department is mandatory.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const s = await createStudent(form);
+      const payload = {
+        ...form,
+        department: form.branch,
+        year: parseInt(form.year),
+        semester: parseInt(form.semester),
+        admission_year: parseInt(form.admission_year),
+      };
+      const s = await createStudent(payload);
       setStudent(s);
       setStep("photos");
     } catch (err) {
@@ -98,19 +129,21 @@ export default function RegisterStudent() {
     }
 
     const currentGuide = CAPTURE_GUIDELINES[photos.length];
-    const newPhotos = [...photos, { frame, angle: currentGuide.tag, title: currentGuide.title }];
-    setPhotos(newPhotos);
-    setFeedback("");
+    setPhotos((prev) => [
+      ...prev,
+      { frame, angle: currentGuide?.tag || `Angle ${prev.length + 1}` },
+    ]);
+    setFeedback(`Captured ${currentGuide?.title || "angle"}`);
 
-    if (newPhotos.length < 5) {
-      setCurrentAngleIdx(newPhotos.length);
+    if (photos.length + 1 < 5) {
+      setCurrentAngleIdx(photos.length + 1);
     }
   };
 
-  const removePhoto = (i) => {
-    const next = photos.filter((_, idx) => idx !== i);
-    setPhotos(next);
-    setCurrentAngleIdx(next.length);
+  const removePhoto = (idx) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+    setCurrentAngleIdx(Math.max(0, photos.length - 2));
+    setFeedback("");
   };
 
   const resetAllPhotos = () => {
@@ -119,106 +152,201 @@ export default function RegisterStudent() {
     setFeedback("");
   };
 
-  const handleRegisterFace = async () => {
-    if (photos.length === 0) {
-      setFeedback("Please capture at least 1 photo (all 5 angles recommended for high accuracy).");
-      return;
-    }
+  const handleRegisterBiometrics = async () => {
     if (!consent) {
-      setFeedback("Biometric consent is required before registering facial data.");
+      setError("Consent checkbox must be checked to register biometric facial data.");
       return;
     }
+    if (photos.length === 0) {
+      setError("Please capture at least 1 photo (5 recommended for accurate multi-angle recognition).");
+      return;
+    }
+
+    setError("");
     setLoading(true);
-    setFeedback("");
     try {
-      const frameList = photos.map((p) => p.frame);
-      await registerFace(student.id, frameList, consent);
-      camRef.current?.stop();
+      const frames = photos.map((p) => p.frame);
+      await registerFace(student.id, frames, consent);
       setStep("done");
     } catch (err) {
-      setFeedback(getErrorMessage(err, "Face registration failed. Ensure face is clear and well-lit."));
+      setError(getErrorMessage(err, "Failed to register face biometrics."));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
-          <UserPlus className="text-indigo-400" /> Multi-Angle Face Registration
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Guided 5-angle biometric enrollment for high-accuracy recognition and anti-spoof defense.
-        </p>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
+          className="btn-secondary p-2"
+          onClick={() => navigate("/students")}
+          aria-label="Back to students list"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-100">Register New Student</h1>
+          <p className="text-gray-400 text-sm mt-0.5">
+            Step {step === "info" ? "1: Student Details" : step === "photos" ? "2: Multi-Angle Biometrics" : "3: Complete"}
+          </p>
+        </div>
       </div>
 
-      {/* Step Progress Bar */}
-      <div className="flex items-center gap-2 text-xs font-medium">
+      {/* Progress Bar */}
+      <div className="flex items-center gap-2">
         {["info", "photos", "done"].map((s, i) => (
-          <React.Fragment key={s}>
+          <div key={s} className="flex-1 flex items-center gap-2">
             <div
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all ${
-                step === s
-                  ? "bg-indigo-600/90 border-indigo-500 text-white shadow-lg shadow-indigo-500/20"
-                  : i < ["info", "photos", "done"].indexOf(step)
-                  ? "bg-green-950/40 border-green-700 text-green-400"
-                  : "border-gray-800 text-gray-500 bg-gray-900/40"
+              className={`h-1.5 flex-1 rounded-full transition-all ${
+                step === s || (step === "photos" && i === 0) || (step === "done" && i <= 2)
+                  ? "bg-indigo-600"
+                  : "bg-gray-800"
               }`}
-            >
-              {i < ["info", "photos", "done"].indexOf(step) ? <CheckCircle size={13} /> : <span>{i + 1}</span>}
-              {s === "info" ? "Student Details" : s === "photos" ? "Biometric Capture" : "Enrolled"}
-            </div>
-            {i < 2 && <div className="flex-1 h-px bg-gray-800" />}
-          </React.Fragment>
+            />
+          </div>
         ))}
       </div>
 
-      {/* Step 1: Info */}
+      {/* Step 1: Student Information Form */}
       {step === "info" && (
-        <div className="card">
+        <div className="card space-y-4">
+          <h2 className="text-base font-semibold text-gray-200 flex items-center gap-2">
+            <UserPlus size={18} className="text-indigo-400" />
+            Mandatory Student Profile Details
+          </h2>
+
           <form onSubmit={handleCreateStudent} className="space-y-4">
             {error && (
-              <p role="alert" className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+              <p role="alert" className="text-red-400 text-xs bg-red-950/60 border border-red-800 rounded-lg p-2.5">
                 {error}
               </p>
             )}
-            <div>
-              <label htmlFor="student-enrollment" className="label">Enrollment Number *</label>
-              <input
-                id="student-enrollment"
-                className="input"
-                placeholder="e.g. CS2024001"
-                value={form.enrollment}
-                onChange={(e) => setForm({ ...form, enrollment: e.target.value })}
-                required
-                autoFocus
-                aria-required="true"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="student-name" className="label">Full Name *</label>
+                <input
+                  id="student-name"
+                  className="input"
+                  placeholder="e.g. Rahul Sharma"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  required
+                  autoFocus
+                  aria-required="true"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="student-enrollment" className="label">Enrollment / Roll Number *</label>
+                <input
+                  id="student-enrollment"
+                  className="input font-mono"
+                  placeholder="e.g. CS2024001"
+                  value={form.enrollment}
+                  onChange={(e) => setForm({ ...form, enrollment: e.target.value })}
+                  required
+                  aria-required="true"
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="student-name" className="label">Full Name *</label>
-              <input
-                id="student-name"
-                className="input"
-                placeholder="e.g. Alex Johnson"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                aria-required="true"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="student-course" className="label">Course Program *</label>
+                <select
+                  id="student-course"
+                  className="input bg-gray-900"
+                  value={form.course}
+                  onChange={(e) => setForm({ ...form, course: e.target.value })}
+                  required
+                >
+                  <option value="B.Tech">B.Tech (Bachelor of Technology)</option>
+                  <option value="M.Tech">M.Tech (Master of Technology)</option>
+                  <option value="BCA">BCA (Computer Applications)</option>
+                  <option value="MCA">MCA (Computer Applications)</option>
+                  <option value="BBA">BBA (Business Administration)</option>
+                  <option value="MBA">MBA (Management)</option>
+                  <option value="Diploma">Diploma Engineering</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="student-branch" className="label">Branch / Department *</label>
+                <select
+                  id="student-branch"
+                  className="input bg-gray-900"
+                  value={form.branch}
+                  onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                  required
+                >
+                  <option value="Computer Science & Engineering (CSE)">Computer Science & Engineering (CSE)</option>
+                  <option value="CSE (AI & Machine Learning)">CSE (AI & Machine Learning)</option>
+                  <option value="CSE (Data Science & Analytics)">CSE (Data Science & Analytics)</option>
+                  <option value="Information Technology (IT)">Information Technology (IT)</option>
+                  <option value="Electronics & Communication (ECE)">Electronics & Communication (ECE)</option>
+                  <option value="Electrical Engineering (EE)">Electrical Engineering (EE)</option>
+                  <option value="Mechanical Engineering (ME)">Mechanical Engineering (ME)</option>
+                  <option value="Civil Engineering (CE)">Civil Engineering (CE)</option>
+                  <option value="Biotechnology">Biotechnology</option>
+                  <option value="Basic Science & Humanities">Basic Science & Humanities</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label htmlFor="student-department" className="label">Department / Branch (optional)</label>
-              <input
-                id="student-department"
-                className="input"
-                placeholder="e.g. Computer Science & Engineering"
-                value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="student-year" className="label">Academic Year *</label>
+                <select
+                  id="student-year"
+                  className="input bg-gray-900"
+                  value={form.year}
+                  onChange={(e) => {
+                    const y = parseInt(e.target.value);
+                    setForm({ ...form, year: y, semester: (y * 2) - 1 });
+                  }}
+                  required
+                >
+                  <option value={1}>1st Year</option>
+                  <option value={2}>2nd Year</option>
+                  <option value={3}>3rd Year</option>
+                  <option value={4}>4th Year</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="student-semester" className="label">Current Semester *</label>
+                <select
+                  id="student-semester"
+                  className="input bg-gray-900"
+                  value={form.semester}
+                  onChange={(e) => setForm({ ...form, semester: parseInt(e.target.value) })}
+                  required
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                    <option key={s} value={s}>Semester {s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="student-admission" className="label">Admission Year *</label>
+                <input
+                  id="student-admission"
+                  type="number"
+                  min={2018}
+                  max={2035}
+                  className="input font-mono"
+                  value={form.admission_year}
+                  onChange={(e) => setForm({ ...form, admission_year: parseInt(e.target.value) })}
+                  required
+                />
+              </div>
             </div>
-            <div className="flex gap-3 pt-2">
+
+            <div className="flex gap-3 pt-3">
               <button
                 type="button"
                 className="btn-secondary flex-1"
@@ -236,12 +364,12 @@ export default function RegisterStudent() {
                 {loading ? (
                   <>
                     <Loader2 size={15} className="animate-spin" role="status" aria-live="polite" />
-                    <span>Creating…</span>
+                    <span>Creating Profile…</span>
                   </>
                 ) : (
                   <>
                     <UserPlus size={15} />
-                    <span>Continue to Biometrics</span>
+                    <span>Continue to Multi-Angle Biometrics →</span>
                   </>
                 )}
               </button>
@@ -394,7 +522,7 @@ export default function RegisterStudent() {
             </button>
             <button
               className="btn-primary flex-1 flex items-center justify-center gap-2 py-2.5"
-              onClick={handleRegisterFace}
+              onClick={handleRegisterBiometrics}
               disabled={loading || photos.length === 0 || !consent}
             >
               {loading ? (
@@ -428,7 +556,15 @@ export default function RegisterStudent() {
               className="btn-secondary"
               onClick={() => {
                 setStep("info");
-                setForm({ enrollment: "", name: "", department: "" });
+                setForm({
+                  enrollment: "",
+                  name: "",
+                  course: "B.Tech",
+                  branch: "Computer Science & Engineering (CSE)",
+                  year: 1,
+                  semester: 1,
+                  admission_year: currentCalYear,
+                });
                 setPhotos([]);
                 setStudent(null);
                 setConsent(false);

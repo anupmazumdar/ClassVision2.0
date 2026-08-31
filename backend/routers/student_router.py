@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -24,7 +24,27 @@ def create_student(
     db: Session = Depends(get_db),
     _: dict = Depends(require_teacher_or_admin),
 ):
-    return student_service.create_student(db, body.enrollment, body.name, body.department)
+    return student_service.create_student(
+        db,
+        enrollment=body.enrollment,
+        name=body.name,
+        department=body.department or body.branch or "",
+        branch=body.branch or body.department or "",
+        course=body.course or "B.Tech",
+        year=body.year or 1,
+        semester=body.semester or 1,
+        admission_year=body.admission_year or 2026,
+    )
+
+
+@router.post("/auto-promote")
+def auto_promote_students(
+    current_year: int = Query(default=2026),
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_teacher_or_admin),
+):
+    """Recalculate and auto-promote all student academic years and semesters based on admission year."""
+    return student_service.auto_promote_students(db, current_year=current_year)
 
 
 @router.post("/{student_id}/register-face")

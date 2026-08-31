@@ -11,7 +11,13 @@ class Student(Base):
     id = Column(Integer, primary_key=True, index=True)
     enrollment = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
-    department = Column(String, default="")
+    department = Column(String, default="")  # Branch/Department
+    branch = Column(String, default="")  # Branch alias
+    course = Column(String, default="B.Tech")  # B.Tech, M.Tech, BCA, MCA, etc.
+    year = Column(Integer, default=1)  # 1, 2, 3, 4
+    semester = Column(Integer, default=1)  # 1 to 8
+    admission_year = Column(Integer, default=2026)  # Calendar year of admission for auto-progression
+    status = Column(String, default="active")  # active, graduated, inactive
     face_encodings = Column(EncryptedText, default="[]")
     device_id = Column(String, nullable=True)  # Bound device identifier
     consent_given = Column(Boolean, default=False, nullable=False)  # Biometric GDPR/Consent Flag

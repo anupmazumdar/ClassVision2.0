@@ -20,6 +20,8 @@ import {
   Zap,
   Volume2,
   VolumeX,
+  Share2,
+  MessageSquare,
 } from "lucide-react";
 import Camera from "../components/Camera";
 import {
@@ -35,6 +37,7 @@ import {
 } from "../api/client";
 import { getDeviceId } from "../utils/device";
 import { useToast } from "../context/ToastContext";
+import { shareToWhatsApp, formatLiveSessionWhatsAppMessage, formatAttendanceWhatsAppMessage } from "../utils/whatsapp";
 
 function playSuccessChime() {
   try {
@@ -413,15 +416,31 @@ export default function Session() {
         </div>
       </div>
 
-      {/* Student Mobile Self Check-in Guidance Banner */}
+      {/* Student Mobile Self Check-in Guidance Banner with WhatsApp Share */}
       {session.is_active && (
         <div className="flex items-center justify-between gap-3 bg-indigo-950/40 border border-indigo-800/60 text-indigo-200 px-4 py-2.5 rounded-xl text-xs flex-wrap">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
             <span>
-              <strong>Student Mobile Self Check-in:</strong> Students can check in on their phone at <span className="text-amber-300 font-mono font-semibold">/checkin</span> with 6-digit code <strong className="text-amber-300 font-mono tracking-wider">{liveCodeInfo.code}</strong> (geofenced to 100m).
+              <strong>Student Mobile Self Check-in:</strong> Students can check in at <span className="text-amber-300 font-mono font-semibold">/checkin</span> with code <strong className="text-amber-300 font-mono tracking-wider">{liveCodeInfo.code}</strong> (100m Geofence).
             </span>
           </div>
+
+          <button
+            onClick={() => {
+              const text = formatLiveSessionWhatsAppMessage({
+                subject: session.subject,
+                room: session.room,
+                code: liveCodeInfo.code,
+              });
+              shareToWhatsApp(text);
+            }}
+            className="flex items-center gap-1.5 bg-green-950/70 hover:bg-green-900/60 text-green-400 border border-green-800/70 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all shadow-sm"
+            title="Broadcast Live Code to WhatsApp Group"
+          >
+            <Share2 size={13} />
+            <span>Share to WhatsApp Group</span>
+          </button>
         </div>
       )}
 

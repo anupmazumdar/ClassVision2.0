@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, Video, FileText,
-  LogOut, Menu, X, GraduationCap, UserCog,
+  LogOut, Menu, X, GraduationCap, UserCog, BookOpen,
 } from "lucide-react";
 
 const baseLinks = [
-  { to: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { to: "/students", label: "Students",  icon: Users },
-  { to: "/reports",  label: "Reports",   icon: FileText },
+  { to: "/",          label: "Dashboard",  icon: LayoutDashboard },
+  { to: "/students",  label: "Students",   icon: Users },
+  { to: "/classroom", label: "Classroom",  icon: BookOpen },
+  { to: "/reports",   label: "Reports",    icon: FileText },
 ];
 
 export default function NavBar() {

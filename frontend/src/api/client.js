@@ -195,3 +195,18 @@ export const downloadExcel = (sessionId) => {
       URL.revokeObjectURL(blobUrl);
     });
 };
+
+export const autoPromoteStudents = (currentYear = new Date().getFullYear()) =>
+  client.post(`/students/auto-promote?current_year=${currentYear}`).then((r) => r.data);
+
+export const getMaterials = (params = {}) =>
+  client.get("/materials", { params }).then((r) => r.data);
+
+export const createMaterial = (data) =>
+  client.post("/materials", data).then((r) => r.data);
+
+export const updateMaterial = (materialId, data) =>
+  client.put(`/materials/${materialId}`, data).then((r) => r.data);
+
+export const deleteMaterial = (materialId) =>
+  client.delete(`/materials/${materialId}`);

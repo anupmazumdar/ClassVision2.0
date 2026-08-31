@@ -42,3 +42,25 @@ def init_db():
         alembic upgrade head
     """
     Base.metadata.create_all(bind=engine)
+    # Ensure newly added columns exist in existing SQLite databases
+    try:
+        with engine.begin() as conn:
+            if engine.dialect.name == "sqlite":
+                res = conn.exec_driver_sql("PRAGMA table_info(students)")
+                existing_cols = {row[1] for row in res.fetchall()}
+                if existing_cols:
+                    if "branch" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN branch VARCHAR DEFAULT ''")
+                    if "course" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN course VARCHAR DEFAULT 'B.Tech'")
+                    if "year" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN year INTEGER DEFAULT 1")
+                    if "semester" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN semester INTEGER DEFAULT 1")
+                    if "admission_year" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN admission_year INTEGER DEFAULT 2026")
+                    if "status" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN status VARCHAR DEFAULT 'active'")
+    except Exception:
+        pass
+

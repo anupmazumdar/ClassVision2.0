@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from config import MAX_IMAGE_BASE64_CHARS
@@ -7,7 +7,27 @@ from config import MAX_IMAGE_BASE64_CHARS
 class StudentCreate(BaseModel):
     enrollment: str = Field(..., min_length=1, max_length=50, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(..., min_length=1, max_length=100)
-    department: str = Field(default="", max_length=100)
+    branch: Optional[str] = Field(default="", max_length=100)
+    department: Optional[str] = Field(default="", max_length=100)
+    course: Optional[str] = Field(default="B.Tech", max_length=50)
+    year: Optional[int] = Field(default=1, ge=1, le=5)
+    semester: Optional[int] = Field(default=1, ge=1, le=10)
+    admission_year: Optional[int] = Field(default=2026, ge=2000, le=2100)
+
+
+class StudentResponse(BaseModel):
+    id: int
+    enrollment: str
+    name: str
+    department: str
+    branch: str
+    course: str
+    year: int
+    semester: int
+    admission_year: int
+    status: str
+    has_face: bool
+    created_at: str
 
 
 class FaceRegisterRequest(BaseModel):

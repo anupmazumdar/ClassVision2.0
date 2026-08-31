@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Download, Loader2, FileSpreadsheet, FileText, Clock,
-  Mail, BarChart2, Send, X,
+  Mail, BarChart2, Send, X, Share2, MessageSquare,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -15,6 +15,7 @@ import {
   emailReport,
   getErrorMessage,
 } from "../api/client";
+import { shareToWhatsApp, formatAttendanceWhatsAppMessage } from "../utils/whatsapp";
 
 export default function Reports() {
   const [tab, setTab] = useState("sessions"); // sessions | chart
@@ -162,6 +163,22 @@ export default function Reports() {
                       </p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                      <button
+                        className="btn-secondary flex items-center gap-1.5 text-sm py-1.5 bg-green-950/40 border-green-800 text-green-300 hover:bg-green-900/40"
+                        onClick={() => {
+                          const text = formatAttendanceWhatsAppMessage({
+                            subject: detail.subject,
+                            room: detail.room,
+                            presentCount: detail.attendance.length,
+                            totalCount: detail.attendance.length,
+                            date: new Date(detail.started_at).toLocaleDateString(),
+                          });
+                          shareToWhatsApp(text);
+                        }}
+                        title="Share Attendance Summary to WhatsApp"
+                      >
+                        <Share2 size={14} /> WhatsApp
+                      </button>
                       <button className="btn-secondary flex items-center gap-1.5 text-sm py-1.5"
                         onClick={() => { setEmailModal(true); setEmailMsg(""); setEmailTo(""); }}>
                         <Mail size={14} /> Email

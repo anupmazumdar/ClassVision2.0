@@ -17,6 +17,7 @@ const StudentCheckin = lazy(() => import("./pages/StudentCheckin"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Students = lazy(() => import("./pages/Students"));
 const RegisterStudent = lazy(() => import("./pages/RegisterStudent"));
+const Classroom = lazy(() => import("./pages/Classroom"));
 const Session = lazy(() => import("./pages/Session"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Users = lazy(() => import("./pages/Users"));
@@ -74,6 +75,14 @@ export default function App() {
                   element={
                     <Protected>
                       <RegisterStudent />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/classroom"
+                  element={
+                    <Protected>
+                      <Classroom />
                     </Protected>
                   }
                 />

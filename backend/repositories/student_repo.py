@@ -1,5 +1,4 @@
 from typing import Optional
-
 from sqlalchemy.orm import Session
 
 from models import AttendanceRecord, Student
@@ -18,12 +17,68 @@ def get_student_by_enrollment(db: Session, enrollment: str):
     return db.query(Student).filter(Student.enrollment == enrollment).first()
 
 
-def create_student(db: Session, *, enrollment: str, name: str, department: str, device_id: Optional[str] = None):
-    student = Student(enrollment=enrollment, name=name, department=department, device_id=device_id)
+def create_student(
+    db: Session,
+    *,
+    enrollment: str,
+    name: str,
+    department: str = "",
+    branch: Optional[str] = None,
+    course: str = "B.Tech",
+    year: int = 1,
+    semester: int = 1,
+    admission_year: int = 2026,
+    device_id: Optional[str] = None,
+):
+    resolved_branch = branch if branch is not None else department
+    student = Student(
+        enrollment=enrollment,
+        name=name,
+        department=resolved_branch,
+        branch=resolved_branch,
+        course=course or "B.Tech",
+        year=year or 1,
+        semester=semester or 1,
+        admission_year=admission_year or 2026,
+        status="active",
+        device_id=device_id,
+    )
     db.add(student)
     db.commit()
     db.refresh(student)
     return student
+
+
+def auto_promote_academic_years(db: Session, current_year: int = 2026) -> dict:
+    """Automatically recalculates and updates academic year & semester based on admission year."""
+    students = db.query(Student).all()
+    updated_count = 0
+
+    for s in students:
+        adm_yr = s.admission_year or 2026
+        diff = max(0, current_year - adm_yr)
+        calc_year = min(5, diff + 1)
+        calc_sem = min(10, calc_year * 2)
+
+        max_course_years = 4
+        if "M.Tech" in (s.course or "") or "MCA" in (s.course or "") or "MBA" in (s.course or ""):
+            max_course_years = 2
+        elif "Diploma" in (s.course or "") or "BCA" in (s.course or "") or "BBA" in (s.course or ""):
+            max_course_years = 3
+
+        if calc_year > max_course_years:
+            s.status = "graduated"
+            s.year = max_course_years
+            s.semester = max_course_years * 2
+        else:
+            s.year = calc_year
+            s.semester = calc_sem
+            s.status = "active"
+
+        updated_count += 1
+
+    db.commit()
+    return {"updated_count": updated_count, "current_year": current_year}
 
 
 def update_student_face_encodings(db: Session, student: Student, encodings_json: str) -> None:
