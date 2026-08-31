@@ -56,6 +56,20 @@ def create_token(user_id: int, email: str, role: str, name: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_student_token(student_id: int, enrollment: str, name: str, course: str, branch: str, year: int) -> str:
+    payload = {
+        "sub": str(student_id),
+        "enrollment": enrollment,
+        "role": "student",
+        "name": name,
+        "course": course,
+        "branch": branch,
+        "year": year,
+        "exp": utc_now() + timedelta(hours=TOKEN_EXPIRE_HOURS),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
 def decode_token(token: str) -> Dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

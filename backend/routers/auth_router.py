@@ -9,7 +9,7 @@ from middleware.jwt_middleware import (
     record_failed_login,
     require_admin,
 )
-from schemas.auth_schema import LoginRequest, RegisterRequest
+from schemas.auth_schema import LoginRequest, RegisterRequest, StudentLoginRequest
 from services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -23,6 +23,24 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     try:
         result = auth_service.login(db, body.email, body.password)
         return result
+    except HTTPException:
+        record_failed_login(client_ip)
+        raise
+
+
+@router.post("/student-login")
+def student_login(request: Request, body: StudentLoginRequest, db: Session = Depends(get_db)):
+    client_ip = get_client_ip(request)
+    check_login_rate_limit(client_ip)
+
+    try:
+        return auth_service.student_login(
+            db=db,
+            enrollment=body.enrollment,
+            device_id=body.device_id,
+            device_info=body.device_info,
+            client_ip=client_ip,
+        )
     except HTTPException:
         record_failed_login(client_ip)
         raise

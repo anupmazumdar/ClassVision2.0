@@ -20,6 +20,11 @@ class Student(Base):
     status = Column(String, default="active")  # active, graduated, inactive
     face_encodings = Column(EncryptedText, default="[]")
     device_id = Column(String, nullable=True)  # Bound device identifier
+    device_approval_status = Column(String, default="approved")  # approved, pending_approval, rejected
+    pending_device_id = Column(String, nullable=True)
+    pending_device_info = Column(String, nullable=True)
+    device_bound_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
     consent_given = Column(Boolean, default=False, nullable=False)  # Biometric GDPR/Consent Flag
     consent_at = Column(DateTime(timezone=True), nullable=True)  # Consent grant timestamp
     created_at = Column(DateTime(timezone=True), default=utc_now)

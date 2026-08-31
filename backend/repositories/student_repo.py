@@ -92,14 +92,63 @@ def record_face_consent(db: Session, student: Student) -> None:
     db.commit()
 
 
+def get_student_by_device_id(db: Session, device_id: str) -> Optional[Student]:
+    """Finds any student currently active on this device."""
+    if not device_id:
+        return None
+    return db.query(Student).filter(Student.device_id == device_id).first()
+
+
 def bind_student_device(db: Session, student: Student, device_id: str) -> None:
     student.device_id = device_id
+    student.device_approval_status = "approved"
+    student.pending_device_id = None
+    student.pending_device_info = None
+    student.device_bound_at = utc_now()
+    student.last_login_at = utc_now()
+    db.commit()
+
+
+def request_device_switch(db: Session, student: Student, new_device_id: str, device_info: Optional[str] = None) -> None:
+    student.device_approval_status = "pending_approval"
+    student.pending_device_id = new_device_id
+    student.pending_device_info = device_info or "Web/Mobile Browser"
+    student.last_login_at = utc_now()
+    db.commit()
+
+
+def approve_device_switch(db: Session, student: Student) -> None:
+    if student.pending_device_id:
+        student.device_id = student.pending_device_id
+    student.device_approval_status = "approved"
+    student.pending_device_id = None
+    student.pending_device_info = None
+    student.device_bound_at = utc_now()
+    db.commit()
+
+
+def reject_device_switch(db: Session, student: Student) -> None:
+    student.device_approval_status = "rejected"
+    student.pending_device_id = None
+    student.pending_device_info = None
+    db.commit()
+
+
+def list_pending_device_requests(db: Session) -> List[Student]:
+    return db.query(Student).filter(Student.device_approval_status == "pending_approval").all()
+
+
+def reset_student_device(db: Session, student: Student) -> None:
+    student.device_id = None
+    student.device_approval_status = "approved"
+    student.pending_device_id = None
+    student.pending_device_info = None
+    student.device_bound_at = None
     db.commit()
 
 
 def unbind_student_device(db: Session, student: Student) -> None:
-    student.device_id = None
-    db.commit()
+    reset_student_device(db, student)
 
 
 def delete_student_attendance(db: Session, student_id: int) -> None:

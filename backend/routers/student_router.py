@@ -57,6 +57,41 @@ def register_face(
     return student_service.register_face(db, student_id, body.images, consent=body.consent)
 
 
+@router.get("/device-requests")
+def list_device_requests(
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_teacher_or_admin),
+):
+    return student_service.list_device_requests(db)
+
+
+@router.post("/{student_id}/approve-device")
+def approve_device(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_teacher_or_admin),
+):
+    return student_service.approve_device_request(db, student_id, approver=current_user)
+
+
+@router.post("/{student_id}/reject-device")
+def reject_device(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_teacher_or_admin),
+):
+    return student_service.reject_device_request(db, student_id, approver=current_user)
+
+
+@router.post("/{student_id}/reset-device")
+def reset_device(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_teacher_or_admin),
+):
+    return student_service.reset_student_device(db, student_id, approver=current_user)
+
+
 @router.delete("/{student_id}", status_code=204)
 def delete_student(
     student_id: int,

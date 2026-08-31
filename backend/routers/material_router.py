@@ -19,7 +19,7 @@ def list_materials(
     year: Optional[str] = Query(default=None),
     search: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     return material_service.list_materials(
         db,
@@ -29,6 +29,7 @@ def list_materials(
         branch=branch,
         year=year,
         search=search,
+        current_user=current_user,
     )
 
 
@@ -60,9 +61,9 @@ def create_material(
 def get_material(
     material_id: int,
     db: Session = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    return material_service.get_material(db, material_id)
+    return material_service.get_material(db, material_id, current_user=current_user)
 
 
 @router.put("/{material_id}")

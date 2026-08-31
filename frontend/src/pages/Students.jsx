@@ -13,9 +13,26 @@ import {
   Filter,
   GraduationCap,
   Sparkles,
+  Smartphone,
+  Check,
   X,
+  History,
+  Lock,
+  RotateCcw,
+  AlertTriangle,
+  FileSpreadsheet,
 } from "lucide-react";
-import { getStudents, deleteStudent, autoPromoteStudents, getErrorMessage } from "../api/client";
+import {
+  getStudents,
+  deleteStudent,
+  autoPromoteStudents,
+  getDeviceRequests,
+  approveDeviceRequest,
+  rejectDeviceRequest,
+  resetStudentDevice,
+  getAuditLogs,
+  getErrorMessage,
+} from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -36,25 +53,91 @@ export default function Students() {
   const toast = useToast();
 
   const [students, setStudents] = useState([]);
+  const [deviceRequests, setDeviceRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("all");
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
+
   const [deleting, setDeleting] = useState(null);
   const [promoting, setPromoting] = useState(false);
+  const [processingDeviceId, setProcessingDeviceId] = useState(null);
+
+  // Modals
+  const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const load = () => {
     getStudents()
       .then(setStudents)
       .finally(() => setLoading(false));
+
+    if (user?.role === "admin" || user?.role === "teacher") {
+      getDeviceRequests()
+        .then(setDeviceRequests)
+        .catch(() => {});
+    }
   };
 
-  useEffect(load, []);
+  useEffect(load, [user]);
 
-  // Compute maximum years based on chosen course
-  const currentCourseObj = COURSES_CONFIG.find((c) => c.id === selectedCourse);
-  const maxYearsForCourse = currentCourseObj ? currentCourseObj.years : 4;
+  const loadAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const data = await getAuditLogs({ limit: 100 });
+      setAuditLogs(data.logs || []);
+      setAuditModalOpen(true);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load audit logs."));
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleApproveDevice = async (studentId) => {
+    setProcessingDeviceId(studentId);
+    try {
+      await approveDeviceRequest(studentId);
+      toast.success("Device switch approved!");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to approve device switch."));
+    } finally {
+      setProcessingDeviceId(null);
+    }
+  };
+
+  const handleRejectDevice = async (studentId) => {
+    setProcessingDeviceId(studentId);
+    try {
+      await rejectDeviceRequest(studentId);
+      toast.info("Device switch request rejected.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to reject device switch."));
+    } finally {
+      setProcessingDeviceId(null);
+    }
+  };
+
+  const handleResetDevice = async (studentId, studentName) => {
+    if (!confirm(`Reset device binding for ${studentName}? They will be able to bind a new device on next login.`)) {
+      return;
+    }
+    setProcessingDeviceId(studentId);
+    try {
+      await resetStudentDevice(studentId);
+      toast.success(`Device binding reset for ${studentName}.`);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to reset device binding."));
+    } finally {
+      setProcessingDeviceId(null);
+    }
+  };
 
   const handleAutoPromote = async () => {
     if (!confirm("Automatically recalculate academic year and semester for all students based on their admission year and course duration?")) {
@@ -80,6 +163,10 @@ export default function Students() {
   };
 
   const hasActiveFilters = search || selectedCourse !== "all" || selectedBranch !== "all" || selectedYear !== "all";
+
+  // Compute maximum years based on chosen course
+  const currentCourseObj = COURSES_CONFIG.find((c) => c.id === selectedCourse);
+  const maxYearsForCourse = currentCourseObj ? currentCourseObj.years : 4;
 
   const filtered = students.filter((s) => {
     const sCourse = (s.course || "B.Tech").toLowerCase();
@@ -127,10 +214,33 @@ export default function Students() {
             <GraduationCap className="text-indigo-400" /> Students Directory
           </h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            {students.length} registered students • B.Tech (4y), BCA/BBA (3y), MCA/MBA/M.Tech (2y)
+            {students.length} registered students • 1-Device Binding & Immutable Audit Ledger Active
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Pending Device Switch Requests Button */}
+          {deviceRequests.length > 0 && (
+            <button
+              className="btn-secondary flex items-center gap-1.5 text-xs text-amber-300 border-amber-800/80 bg-amber-950/40 hover:bg-amber-900/50 animate-pulse"
+              onClick={() => setDeviceModalOpen(true)}
+            >
+              <Smartphone size={13} />
+              <span>{deviceRequests.length} Device Requests</span>
+            </button>
+          )}
+
+          {/* Immutable Audit Logs Button */}
+          <button
+            className="btn-secondary flex items-center gap-1.5 text-xs text-emerald-300 border-emerald-800/60 hover:bg-emerald-950/40"
+            onClick={loadAuditLogs}
+            disabled={auditLoading}
+            title="Inspect Immutable Access & Security Audit Ledger"
+          >
+            {auditLoading ? <Loader2 size={13} className="animate-spin" /> : <History size={13} />}
+            <span>Audit Logs</span>
+          </button>
+
+          {/* Auto Promote Years */}
           {user?.role === "admin" && (
             <button
               className="btn-secondary flex items-center gap-1.5 text-xs text-indigo-300 border-indigo-800/60 hover:bg-indigo-950/40"
@@ -142,6 +252,7 @@ export default function Students() {
               <span>Auto-Update Years</span>
             </button>
           )}
+
           <button className="btn-primary flex items-center gap-2" onClick={() => navigate("/students/register")}>
             <UserPlus size={16} /> Register Student
           </button>
@@ -284,9 +395,9 @@ export default function Students() {
                 <th className="text-left px-4 py-3">Enrollment No</th>
                 <th className="text-left px-4 py-3">Course & Branch</th>
                 <th className="text-center px-4 py-3">Academic Year</th>
+                <th className="text-center px-4 py-3">Device Lock</th>
                 <th className="text-center px-4 py-3">Biometrics</th>
-                <th className="text-center px-4 py-3">Consent</th>
-                {user?.role === "admin" && <th className="px-4 py-3 text-right">Actions</th>}
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
@@ -313,6 +424,27 @@ export default function Students() {
                       Year {s.year || 1} • Sem {s.semester || 1}
                     </span>
                   </td>
+
+                  {/* Device Lock Status */}
+                  <td className="px-4 py-3 text-center">
+                    {s.device_approval_status === "pending_approval" ? (
+                      <button
+                        onClick={() => setDeviceModalOpen(true)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-950/80 border border-amber-700/80 text-amber-300 px-2 py-0.5 rounded-full animate-pulse"
+                        title="Click to view & approve device change request"
+                      >
+                        <Smartphone size={11} /> Switch Pending
+                      </button>
+                    ) : s.device_id ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                        <Lock size={11} /> Bound
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-gray-500">Unbound</span>
+                    )}
+                  </td>
+
+                  {/* Biometrics */}
                   <td className="px-4 py-3 text-center">
                     {s.has_face ? (
                       <span className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">
@@ -324,33 +456,189 @@ export default function Students() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    {s.consent_given ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-green-400" title="Biometric Consent Granted">
-                        <ShieldCheck size={14} />
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-500" title="No Consent">
-                        <ShieldAlert size={14} />
-                      </span>
-                    )}
+
+                  {/* Actions */}
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {s.device_id && (
+                        <button
+                          className="text-gray-500 hover:text-amber-400 transition-colors p-1"
+                          onClick={() => handleResetDevice(s.id, s.name)}
+                          disabled={processingDeviceId === s.id}
+                          title="Reset Device Binding (Allow student to bind new phone)"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+
+                      {user?.role === "admin" && (
+                        <button
+                          className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                          onClick={() => handleDelete(s.id, s.name)}
+                          disabled={deleting === s.id}
+                          title="Delete Student"
+                        >
+                          {deleting === s.id ? <Loader2 size={15} className="animate-spin text-red-400" /> : <Trash2 size={15} />}
+                        </button>
+                      )}
+                    </div>
                   </td>
-                  {user?.role === "admin" && (
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        className="text-gray-500 hover:text-red-400 transition-colors p-1"
-                        onClick={() => handleDelete(s.id, s.name)}
-                        disabled={deleting === s.id}
-                        title="Delete Student"
-                      >
-                        {deleting === s.id ? <Loader2 size={15} className="animate-spin text-red-400" /> : <Trash2 size={15} />}
-                      </button>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* DEVICE SWITCH APPROVAL MODAL */}
+      {deviceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
+              <h2 className="text-base font-bold text-gray-100 flex items-center gap-2">
+                <Smartphone size={17} className="text-amber-400" /> Student Device Switch Requests
+              </h2>
+              <button
+                onClick={() => setDeviceModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {deviceRequests.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-xs">
+                  No pending device switch requests. All student logins are verified.
+                </div>
+              ) : (
+                deviceRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-4 rounded-xl border border-gray-800 bg-gray-950/80 space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-sm text-gray-100">{req.name}</h3>
+                        <p className="text-xs text-indigo-400 font-mono">
+                          {req.enrollment} • {req.course} ({req.branch})
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded-full font-medium">
+                        Approval Required
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-gray-400 space-y-1 bg-gray-900 p-2.5 rounded-lg border border-gray-800">
+                      <div>📱 <strong>New Device Info:</strong> {req.pending_device_info || "Web Browser"}</div>
+                      <div className="font-mono text-[10px] text-gray-500 truncate">Device Fingerprint: {req.pending_device_id}</div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => handleRejectDevice(req.id)}
+                        disabled={processingDeviceId === req.id}
+                        className="btn-secondary text-xs text-rose-400 border-rose-900/60 hover:bg-rose-950/40 py-1 px-3"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleApproveDevice(req.id)}
+                        disabled={processingDeviceId === req.id}
+                        className="btn-primary text-xs py-1 px-3.5 flex items-center gap-1.5"
+                      >
+                        {processingDeviceId === req.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Check size={13} />
+                        )}
+                        <span>Approve Device Switch</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-800 text-right shrink-0">
+              <button className="btn-secondary text-xs" onClick={() => setDeviceModalOpen(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMMUTABLE ACCESS & SECURITY AUDIT LOGS MODAL (Read-Only) */}
+      {auditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+          <div className="card w-full max-w-3xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-gray-100 flex items-center gap-2">
+                  <History size={17} className="text-emerald-400" /> Immutable Access & Security Audit Ledger
+                </h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Write-Once, Read-Many (WORM) • Cryptographically chained SHA-256 digests • Permanent & undeletable
+                </p>
+              </div>
+              <button
+                onClick={() => setAuditModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-2 pr-1 text-xs">
+              {auditLogs.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">No audit records logged yet.</div>
+              ) : (
+                auditLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-xl border border-gray-800 bg-gray-950/80 space-y-1.5 hover:border-gray-700 transition-colors"
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          log.event_type.includes("BLOCKED") || log.event_type.includes("CONFLICT")
+                            ? "bg-rose-950 text-rose-300 border-rose-800"
+                            : log.event_type.includes("APPROVED") || log.event_type.includes("SUCCESS")
+                            ? "bg-emerald-950 text-emerald-300 border-emerald-800"
+                            : "bg-indigo-950 text-indigo-300 border-indigo-800"
+                        }`}>
+                          {log.event_type}
+                        </span>
+                        <span className="font-mono text-gray-200">{log.actor_id}</span>
+                        <span className="text-[10px] text-gray-500 uppercase">({log.actor_type})</span>
+                      </div>
+                      <span className="text-[11px] text-gray-400">
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString() : "Recently"}
+                      </span>
+                    </div>
+
+                    {/* Details and Hash */}
+                    <div className="text-[11px] text-gray-400 bg-gray-900/90 p-2 rounded-lg border border-gray-800/80 space-y-0.5">
+                      <div className="truncate">
+                        📄 <strong>Details:</strong> {JSON.stringify(log.details)}
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono truncate">
+                        🔒 <strong>SHA-256 Digest:</strong> {log.log_hash}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-800 flex items-center justify-between shrink-0 text-xs text-gray-500">
+              <span>{auditLogs.length} total immutable audit records stored</span>
+              <button className="btn-secondary text-xs" onClick={() => setAuditModalOpen(false)}>
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

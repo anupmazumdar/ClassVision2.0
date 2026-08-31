@@ -29,3 +29,10 @@ class RegisterRequest(BaseModel):
         if not re.match(r"^[^@\s]+@[^@\s]+", v):
             raise ValueError("Invalid email format")
         return v
+
+
+class StudentLoginRequest(BaseModel):
+    enrollment: str = Field(..., min_length=1, max_length=100)
+    device_id: str = Field(..., min_length=1, max_length=255)
+    device_info: str = Field(default="Web/Mobile Browser", max_length=255)
+

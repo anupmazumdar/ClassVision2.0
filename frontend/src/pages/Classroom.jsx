@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Sparkles,
   Users,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { getMaterials, createMaterial, deleteMaterial, getErrorMessage } from "../api/client";
@@ -51,13 +52,14 @@ export default function Classroom() {
   const { user } = useAuth();
   const toast = useToast();
 
+  const isStudent = user?.role === "student";
   const isTeacherOrAdmin = user?.role === "teacher" || user?.role === "admin";
 
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
-  const [filterCourse, setFilterCourse] = useState("all");
+  const [filterCourse, setFilterCourse] = useState(isStudent ? user?.course || "all" : "all");
   const [filterBranch, setFilterBranch] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
 
@@ -164,12 +166,14 @@ export default function Classroom() {
 
   const handleResetFilters = () => {
     setSearch("");
-    setFilterCourse("all");
+    if (!isStudent) {
+      setFilterCourse("all");
+    }
     setFilterBranch("all");
     setFilterYear("all");
   };
 
-  const hasActiveFilters = search || filterCourse !== "all" || filterBranch !== "all" || filterYear !== "all";
+  const hasActiveFilters = search || (filterCourse !== "all" && !isStudent) || filterBranch !== "all" || filterYear !== "all";
 
   const filteredMaterials = materials.filter((m) => {
     const matchesTab = activeTab === "all" || m.material_type === activeTab;
@@ -193,6 +197,33 @@ export default function Classroom() {
 
   return (
     <div className="space-y-6">
+      {/* Student Designated Banner */}
+      {isStudent && (
+        <div className="card bg-gradient-to-r from-indigo-950/80 via-purple-950/60 to-gray-900 border-indigo-700/60 p-4 shadow-xl">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-md">
+                {user?.name?.charAt(0) || "S"}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-gray-100">{user?.name}</h2>
+                  <span className="text-[10px] font-semibold bg-emerald-950 border border-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <ShieldCheck size={11} /> Device Bound & Verified
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-300 mt-0.5 font-mono">
+                  Enrollment: {user?.enrollment} • Course: <strong className="text-white">{user?.course || "BCA"}</strong> • Year {user?.year || 1}
+                </p>
+              </div>
+            </div>
+            <div className="text-[11px] text-gray-400 bg-gray-900/80 border border-gray-800 px-3 py-1.5 rounded-lg">
+              🔒 Viewing designated materials exclusively for <strong>{user?.course || "BCA"}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -272,6 +303,7 @@ export default function Classroom() {
             <select
               className="input bg-gray-950 text-xs font-medium"
               value={filterCourse}
+              disabled={isStudent}
               onChange={(e) => {
                 const c = e.target.value;
                 setFilterCourse(c);
@@ -338,11 +370,11 @@ export default function Classroom() {
         {/* Filter info */}
         <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5 border-t border-gray-800/60">
           <span>
-            Showing <strong className="text-indigo-400">{filteredMaterials.length}</strong> of <strong>{materials.length}</strong> items
+            Showing <strong className="text-indigo-400">{filteredMaterials.length}</strong> of <strong>{materials.length}</strong> materials
           </span>
-          {hasActiveFilters && (
-            <span className="text-gray-500 italic">
-              Filtered ({filterCourse !== "all" ? filterCourse : "All"} • {filterBranch !== "all" ? filterBranch : "All"} • {filterYear !== "all" ? filterYear : "All Yrs"})
+          {isStudent && (
+            <span className="text-emerald-400 font-medium">
+              🔒 Filtered for {user?.course || "Your Program"}
             </span>
           )}
         </div>
@@ -359,7 +391,7 @@ export default function Classroom() {
             <BookOpen size={24} />
           </div>
           <p className="text-sm">
-            {hasActiveFilters ? "No materials match your filter criteria." : "No study materials or assignments found."}
+            {hasActiveFilters ? "No materials match your filter criteria." : "No study materials or assignments found for your program."}
           </p>
           {hasActiveFilters ? (
             <button className="btn-secondary text-xs text-indigo-400 border-indigo-800" onClick={handleResetFilters}>
@@ -405,7 +437,7 @@ export default function Classroom() {
                         <Share2 size={14} />
                       </button>
 
-                      {/* Delete button */}
+                      {/* Delete button (Teacher/Admin only) */}
                       {isTeacherOrAdmin && (
                         <button
                           onClick={() => handleDelete(m.id, m.title)}
@@ -485,8 +517,8 @@ export default function Classroom() {
         </div>
       )}
 
-      {/* POST MATERIAL MODAL */}
-      {modalOpen && (
+      {/* POST MATERIAL MODAL (Teachers/Admins only) */}
+      {modalOpen && isTeacherOrAdmin && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
           <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 my-auto max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">

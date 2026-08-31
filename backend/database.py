@@ -61,6 +61,16 @@ def init_db():
                         conn.exec_driver_sql("ALTER TABLE students ADD COLUMN admission_year INTEGER DEFAULT 2026")
                     if "status" not in existing_cols:
                         conn.exec_driver_sql("ALTER TABLE students ADD COLUMN status VARCHAR DEFAULT 'active'")
+                    if "device_approval_status" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN device_approval_status VARCHAR DEFAULT 'approved'")
+                    if "pending_device_id" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN pending_device_id VARCHAR")
+                    if "pending_device_info" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN pending_device_info VARCHAR")
+                    if "device_bound_at" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN device_bound_at DATETIME")
+                    if "last_login_at" not in existing_cols:
+                        conn.exec_driver_sql("ALTER TABLE students ADD COLUMN last_login_at DATETIME")
     except Exception:
         pass
 

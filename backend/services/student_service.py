@@ -44,6 +44,11 @@ def list_students(db: Session, caller_role: str = "teacher") -> list[dict]:
             "consent_given": bool(s.consent_given),
             "consent_at": s.consent_at.isoformat() if s.consent_at else None,
             "device_id": s.device_id,
+            "device_approval_status": s.device_approval_status or "approved",
+            "pending_device_id": s.pending_device_id,
+            "pending_device_info": s.pending_device_info,
+            "device_bound_at": s.device_bound_at.isoformat() if s.device_bound_at else None,
+            "last_login_at": s.last_login_at.isoformat() if s.last_login_at else None,
             "created_at": s.created_at.isoformat(),
         }
         for s in students
@@ -135,3 +140,96 @@ def delete_student(db: Session, student_id: int) -> None:
 
     student_repo.delete_student_attendance(db, student_id)
     student_repo.delete_student(db, student)
+
+
+def list_device_requests(db: Session) -> list[dict]:
+    requests = student_repo.list_pending_device_requests(db)
+    return [
+        {
+            "id": s.id,
+            "enrollment": s.enrollment,
+            "name": s.name,
+            "course": s.course,
+            "branch": s.branch or s.department,
+            "year": s.year,
+            "current_device_id": s.device_id,
+            "pending_device_id": s.pending_device_id,
+            "pending_device_info": s.pending_device_info,
+            "requested_at": s.last_login_at.isoformat() if s.last_login_at else None,
+        }
+        for s in requests
+    ]
+
+
+def approve_device_request(db: Session, student_id: int, approver: dict) -> dict:
+    student = student_repo.get_student_by_id(db, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    old_device = student.device_id
+    new_device = student.pending_device_id
+    student_repo.approve_device_switch(db, student)
+
+    from services import audit_service
+    audit_service.record_audit_event(
+        db=db,
+        event_type="DEVICE_SWITCH_APPROVED",
+        actor_type=approver.get("role", "admin"),
+        actor_id=approver.get("email") or approver.get("name", "Admin"),
+        device_id=new_device,
+        details={
+            "student_id": student.id,
+            "enrollment": student.enrollment,
+            "old_device": old_device,
+            "new_device": new_device,
+            "approved_by": approver.get("name"),
+        },
+    )
+    return {"message": f"Device switch approved for {student.name} ({student.enrollment}).", "student_id": student.id}
+
+
+def reject_device_request(db: Session, student_id: int, approver: dict) -> dict:
+    student = student_repo.get_student_by_id(db, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    student_repo.reject_device_switch(db, student)
+
+    from services import audit_service
+    audit_service.record_audit_event(
+        db=db,
+        event_type="DEVICE_SWITCH_REJECTED",
+        actor_type=approver.get("role", "admin"),
+        actor_id=approver.get("email") or approver.get("name", "Admin"),
+        details={
+            "student_id": student.id,
+            "enrollment": student.enrollment,
+            "rejected_by": approver.get("name"),
+        },
+    )
+    return {"message": f"Device switch rejected for {student.name}.", "student_id": student.id}
+
+
+def reset_student_device(db: Session, student_id: int, approver: dict) -> dict:
+    student = student_repo.get_student_by_id(db, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    old_device = student.device_id
+    student_repo.reset_student_device(db, student)
+
+    from services import audit_service
+    audit_service.record_audit_event(
+        db=db,
+        event_type="DEVICE_BINDING_RESET",
+        actor_type=approver.get("role", "admin"),
+        actor_id=approver.get("email") or approver.get("name", "Admin"),
+        details={
+            "student_id": student.id,
+            "enrollment": student.enrollment,
+            "previous_device": old_device,
+            "reset_by": approver.get("name"),
+        },
+    )
+    return {"message": f"Device binding reset for {student.name}. They can now bind a new device on next login.", "student_id": student.id}
+

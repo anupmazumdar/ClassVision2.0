@@ -217,3 +217,30 @@ export const askAssistant = (message, history = []) =>
 export const getAssistantFaqs = () =>
   client.get("/assistant/faqs").then((r) => r.data);
 
+export const studentLogin = (enrollment, device_id = null, device_info = "Web Browser") => {
+  const resolvedDeviceId = device_id || getDeviceId();
+  return client
+    .post("/auth/student-login", {
+      enrollment,
+      device_id: resolvedDeviceId,
+      device_info,
+    })
+    .then((r) => r.data);
+};
+
+export const getDeviceRequests = () =>
+  client.get("/students/device-requests").then((r) => r.data);
+
+export const approveDeviceRequest = (studentId) =>
+  client.post(`/students/${studentId}/approve-device`).then((r) => r.data);
+
+export const rejectDeviceRequest = (studentId) =>
+  client.post(`/students/${studentId}/reject-device`).then((r) => r.data);
+
+export const resetStudentDevice = (studentId) =>
+  client.post(`/students/${studentId}/reset-device`).then((r) => r.data);
+
+export const getAuditLogs = (params = {}) =>
+  client.get("/audit-logs", { params }).then((r) => r.data);
+
+

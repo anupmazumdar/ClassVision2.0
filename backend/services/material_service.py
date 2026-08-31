@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from repositories import material_repo
+from services import audit_service
 
 
 def serialize_material(m) -> dict:
@@ -37,14 +38,38 @@ def list_materials(
     branch: Optional[str] = None,
     year: Optional[str] = None,
     search: Optional[str] = None,
+    current_user: Optional[dict] = None,
 ) -> List[dict]:
+    # Designated access control: If logged in as student, force filtering by student's course & branch
+    effective_course = course
+    effective_branch = branch
+    effective_year = year
+
+    if current_user and current_user.get("role") == "student":
+        student_course = current_user.get("course")
+        student_branch = current_user.get("branch")
+        student_year = current_user.get("year")
+
+        if student_course:
+            effective_course = student_course
+        if student_branch and student_branch != "General":
+            effective_branch = student_branch
+
+        audit_service.record_audit_event(
+            db=db,
+            event_type="STUDENT_MATERIALS_ACCESS",
+            actor_type="student",
+            actor_id=current_user.get("enrollment") or str(current_user.get("sub")),
+            details={"course": student_course, "branch": student_branch, "year": student_year},
+        )
+
     items = material_repo.list_materials(
         db,
         material_type=material_type,
         subject=subject,
-        course=course,
-        branch=branch,
-        year=year,
+        course=effective_course,
+        branch=effective_branch,
+        year=effective_year,
         search=search,
     )
     return [serialize_material(m) for m in items]
@@ -90,10 +115,23 @@ def create_material(
     return serialize_material(mat)
 
 
-def get_material(db: Session, material_id: int) -> dict:
+def get_material(db: Session, material_id: int, current_user: Optional[dict] = None) -> dict:
     mat = material_repo.get_material_by_id(db, material_id)
     if not mat:
         raise HTTPException(status_code=404, detail="Material not found")
+
+    if current_user and current_user.get("role") == "student":
+        student_course = current_user.get("course")
+        if mat.course != "All" and student_course and mat.course.lower() != student_course.lower():
+            audit_service.record_audit_event(
+                db=db,
+                event_type="UNAUTHORIZED_MATERIAL_ACCESS_BLOCKED",
+                actor_type="student",
+                actor_id=current_user.get("enrollment") or str(current_user.get("sub")),
+                details={"material_id": material_id, "material_course": mat.course, "student_course": student_course},
+            )
+            raise HTTPException(status_code=403, detail="Forbidden: You do not have access to materials outside your enrolled course.")
+
     return serialize_material(mat)
 
 
