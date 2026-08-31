@@ -32,11 +32,18 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-indigo-900/50">
-            <GraduationCap size={28} className="text-white" />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3 shadow-xl shadow-indigo-950/60 bg-white p-1.5 border border-gray-700">
+            <img
+              src="/uem_logo.jpg"
+              alt="UEM Logo"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.target.style.display = "none";
+              }}
+            />
           </div>
-          <h1 className="text-2xl font-bold text-gray-100">ClassVision</h1>
-          <p className="text-gray-500 text-sm mt-1">AI Attendance System</p>
+          <h1 className="text-2xl font-bold text-gray-100">UEM ClassVision</h1>
+          <p className="text-indigo-400 text-xs font-medium mt-1">Smart AI Attendance System</p>
         </div>
 
         {/* Card */}

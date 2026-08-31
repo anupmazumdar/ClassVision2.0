@@ -30,9 +30,18 @@ export default function NavBar() {
     <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 font-bold text-indigo-400 text-lg">
-          <GraduationCap size={22} />
-          ClassVision
+        <Link to="/" className="flex items-center gap-2.5 font-bold text-gray-100 text-lg group">
+          <img
+            src="/uem_logo.jpg"
+            alt="UEM Logo"
+            className="w-8 h-8 rounded-lg object-contain bg-white/95 p-0.5 shadow-sm border border-gray-700"
+            onError={(e) => {
+              e.target.style.display = "none";
+            }}
+          />
+          <span className="bg-gradient-to-r from-indigo-400 to-indigo-200 bg-clip-text text-transparent group-hover:from-indigo-300 group-hover:to-white transition-colors">
+            UEM ClassVision
+          </span>
         </Link>
 
         {/* Desktop nav */}

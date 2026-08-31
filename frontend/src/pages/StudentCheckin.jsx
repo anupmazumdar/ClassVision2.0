@@ -123,13 +123,20 @@ export default function StudentCheckin() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-4">
       {/* Top Header */}
       <div className="w-full max-w-md flex flex-col items-center mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/40">
-            <GraduationCap size={22} className="text-white" />
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-950/60 bg-white p-1 border border-gray-700">
+            <img
+              src="/uem_logo.jpg"
+              alt="UEM Logo"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.target.style.display = "none";
+              }}
+            />
           </div>
-          <span className="text-xl font-bold text-gray-100">ClassVision</span>
+          <span className="text-xl font-bold text-gray-100">UEM ClassVision</span>
         </div>
-        <p className="text-xs text-gray-400">Student Self-Attendance Portal</p>
+        <p className="text-xs text-indigo-400 font-medium">Student Self-Attendance Portal</p>
       </div>
 
       {/* Main Card */}
