@@ -10,6 +10,10 @@ def list_recent_sessions(db: Session, limit: int = 50):
     return db.query(ClassSession).order_by(ClassSession.started_at.desc()).limit(limit).all()
 
 
+def list_active_sessions(db: Session):
+    return db.query(ClassSession).filter(ClassSession.is_active == True).all()
+
+
 def close_active_sessions_for_teacher(db: Session, teacher_id: int) -> None:
     db.query(ClassSession).filter(
         ClassSession.teacher_id == teacher_id,

@@ -372,10 +372,11 @@ export default function Session() {
             <div className="flex items-center gap-2 bg-indigo-950/80 border border-indigo-700/70 rounded-xl px-3 py-1.5 text-indigo-200 shadow-inner">
               <KeyRound size={15} className="text-indigo-400 animate-pulse" />
               <div className="text-left">
-                <div className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider">
-                  Rolling Code ({liveCodeInfo.expires_in}s)
+                <div className="text-[10px] uppercase font-semibold text-indigo-400 tracking-wider flex items-center gap-1">
+                  <span>Self Check-in Code</span>
+                  <span className="text-gray-400 font-normal">({liveCodeInfo.expires_in}s)</span>
                 </div>
-                <div className="text-base font-mono font-bold tracking-widest text-white">
+                <div className="text-base font-mono font-bold tracking-widest text-amber-300">
                   {liveCodeInfo.code}
                 </div>
               </div>
@@ -411,6 +412,18 @@ export default function Session() {
           )}
         </div>
       </div>
+
+      {/* Student Mobile Self Check-in Guidance Banner */}
+      {session.is_active && (
+        <div className="flex items-center justify-between gap-3 bg-indigo-950/40 border border-indigo-800/60 text-indigo-200 px-4 py-2.5 rounded-xl text-xs flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            <span>
+              <strong>Student Mobile Self Check-in:</strong> Students can check in on their phone at <span className="text-amber-300 font-mono font-semibold">/checkin</span> with 6-digit code <strong className="text-amber-300 font-mono tracking-wider">{liveCodeInfo.code}</strong> (geofenced to 100m).
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Security alert banner */}
       {antiSpoofAlert && (

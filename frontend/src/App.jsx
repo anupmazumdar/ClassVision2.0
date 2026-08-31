@@ -13,6 +13,7 @@ export { useAuth, AuthProvider } from "./context/AuthContext";
 
 // Lazy-loaded route components for optimal bundle splitting
 const Login = lazy(() => import("./pages/Login"));
+const StudentCheckin = lazy(() => import("./pages/StudentCheckin"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Students = lazy(() => import("./pages/Students"));
 const RegisterStudent = lazy(() => import("./pages/RegisterStudent"));
@@ -50,6 +51,8 @@ export default function App() {
             <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/checkin" element={<StudentCheckin />} />
+                <Route path="/student-checkin" element={<StudentCheckin />} />
                 <Route
                   path="/"
                   element={

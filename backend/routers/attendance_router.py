@@ -3,10 +3,27 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from middleware.jwt_middleware import get_current_user, require_teacher_or_admin
-from schemas.attendance_schema import ManualMarkRequest, MarkRequest, RecognizeRequest, ScanAndMarkRequest
+from schemas.attendance_schema import ManualMarkRequest, MarkRequest, RecognizeRequest, ScanAndMarkRequest, SelfCheckinRequest
 from services import attendance_service
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
+
+
+@router.post("/self-checkin", status_code=200)
+def student_self_checkin(
+    body: SelfCheckinRequest,
+    db: Session = Depends(get_db),
+):
+    """Public self check-in endpoint for students using 6-digit rolling code, GPS geofencing, and facial biometrics."""
+    return attendance_service.self_checkin_by_student(
+        db,
+        code=body.code,
+        lat=body.lat,
+        lng=body.lng,
+        image=body.image,
+        frames=body.frames,
+        device_id=body.device_id,
+    )
 
 
 @router.post("/recognize")

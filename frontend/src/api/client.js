@@ -96,6 +96,20 @@ export const recognizeFaces = (image, frames = null, sessionId = null) =>
     })
     .then((r) => r.data);
 
+export const selfCheckin = ({ code, image, frames = null, lat = null, lng = null, device_id = null }) => {
+  const resolvedDeviceId = device_id !== null ? device_id : getDeviceId();
+  return client
+    .post("/attendance/self-checkin", {
+      code,
+      image,
+      frames,
+      lat,
+      lng,
+      device_id: resolvedDeviceId,
+    })
+    .then((r) => r.data);
+};
+
 export const scanAndMark = (sessionId, image, frames = null, extra = {}) => {
   const resolvedDeviceId =
     extra.device_id !== undefined ? extra.device_id : getDeviceId();

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { GraduationCap, Loader2, QrCode } from "lucide-react";
 import { login, getErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
@@ -75,7 +75,7 @@ export default function Login() {
             </div>
 
             {error && (
-              <p role="alert" className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+              <p role="alert" className="text-red-400 text-xs bg-red-950/50 border border-red-800 p-2.5 rounded-lg">
                 {error}
               </p>
             )}
@@ -96,6 +96,16 @@ export default function Login() {
               )}
             </button>
           </form>
+
+          <div className="mt-4 pt-4 border-t border-gray-800 text-center">
+            <Link
+              to="/checkin"
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1.5 transition-colors"
+            >
+              <QrCode size={13} />
+              <span>Student Self Check-in Portal (100m Geofence) →</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

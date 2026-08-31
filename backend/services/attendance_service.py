@@ -403,3 +403,127 @@ def manual_mark_teacher(
 
 def unmark_attendance(db: Session, session_id: int, student_id: int) -> None:
     attendance_repo.delete_session_student_record(db, session_id, student_id)
+
+
+def self_checkin_by_student(
+    db: Session,
+    *,
+    code: str,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    image: Optional[str] = None,
+    frames: Optional[List[str]] = None,
+    device_id: Optional[str] = None,
+) -> dict:
+    """Self check-in for students using the 6-digit rolling session code, GPS geofence, and facial biometrics."""
+    cleaned_code = str(code).strip()
+    if not cleaned_code:
+        raise HTTPException(status_code=400, detail="Please enter the 6-digit session code.")
+
+    # 1. Locate the active session matching this 6-digit code
+    active_sessions = session_repo.list_active_sessions(db)
+    matched_session = None
+    for s in active_sessions:
+        if verify_session_code(s.id, cleaned_code):
+            matched_session = s
+            break
+
+    if not matched_session:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired 6-digit session code. Please check the code currently displayed on the teacher's screen.",
+        )
+
+    # 2. Geofence Verification (if teacher configured GPS room location)
+    distance_meters = None
+    if matched_session.room_lat is not None and matched_session.room_lng is not None:
+        if lat is None or lng is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Classroom Geofencing is active. Please enable GPS location on your device to check in.",
+            )
+        distance_meters = calculate_haversine_distance(
+            lat, lng, matched_session.room_lat, matched_session.room_lng
+        )
+        max_allowed = matched_session.radius_meters or 100.0
+        if distance_meters > max_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Geofence check failed: You are {int(distance_meters)}m away from the classroom (allowed radius: {int(max_allowed)}m). You must be present inside the classroom to check in.",
+            )
+
+    # 3. Biometric Face Image & Liveness Verification
+    primary_img_b64 = image or (frames[0] if frames and len(frames) > 0 else None)
+    if not primary_img_b64:
+        raise HTTPException(status_code=400, detail="Face capture is required for self check-in.")
+
+    # Liveness check if sequential burst frames provided
+    if frames and len(frames) >= 2:
+        liveness_res = verify_liveness(frames)
+        if not liveness_res.get("is_live", False):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Anti-Spoofing check failed: {liveness_res.get('details', 'Static photo or screen spoofing detected')}. Please capture a live selfie with natural movement.",
+            )
+
+    # Decode and recognize face
+    img_bgr = decode_image(primary_img_b64)
+    all_students = student_repo.list_students(db)
+    recognized = recognize_faces(img_bgr, all_students)
+
+    if not recognized or len(recognized) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Face not recognized. Please ensure your face is well-lit and clearly centered, or verify you are registered in the student database.",
+        )
+
+    top_match = recognized[0]
+    matched_student_id = top_match["student_id"]
+    student = student_repo.get_student_by_id(db, matched_student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student record not found.")
+
+    # 4. Device Binding Check
+    if device_id:
+        if student.device_id and student.device_id != device_id:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Device mismatch: Your student profile ({student.name}) is registered to another device. Proxy check-ins from multiple devices are blocked.",
+            )
+        elif not student.device_id:
+            student_repo.bind_student_device(db, student, device_id)
+
+    # 5. Check if already marked in this session
+    existing = attendance_repo.get_session_student_record(db, matched_session.id, matched_student_id)
+    if existing:
+        return {
+            "message": f"Attendance already recorded for {student.name}",
+            "student_id": student.id,
+            "name": student.name,
+            "enrollment": student.enrollment,
+            "subject": matched_session.subject,
+            "room": matched_session.room,
+            "already_present": True,
+            "confidence": top_match["confidence"],
+            "distance_meters": round(distance_meters, 1) if distance_meters is not None else None,
+        }
+
+    # Record attendance
+    attendance_repo.create_record(
+        db,
+        session_id=matched_session.id,
+        student_id=matched_student_id,
+        confidence=top_match["confidence"],
+    )
+
+    return {
+        "message": f"Attendance successfully marked for {student.name}!",
+        "student_id": student.id,
+        "name": student.name,
+        "enrollment": student.enrollment,
+        "subject": matched_session.subject,
+        "room": matched_session.room,
+        "already_present": False,
+        "confidence": top_match["confidence"],
+        "distance_meters": round(distance_meters, 1) if distance_meters is not None else None,
+    }

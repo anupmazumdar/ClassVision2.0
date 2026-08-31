@@ -50,3 +50,22 @@ class MarkRequest(BaseModel):
 
 class ManualMarkRequest(BaseModel):
     student_id: int
+
+
+class SelfCheckinRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6)
+    image: Optional[str] = Field(default=None, max_length=MAX_IMAGE_BASE64_CHARS)
+    frames: Optional[List[str]] = Field(default=None, max_length=5)
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    device_id: Optional[str] = None
+
+    @field_validator("frames", mode="after")
+    @classmethod
+    def validate_frame_sizes(cls, v):
+        if v:
+            for i, f in enumerate(v):
+                if len(f) > MAX_IMAGE_BASE64_CHARS:
+                    raise ValueError(f"Frame at index {i} exceeds maximum allowed size ({MAX_IMAGE_BASE64_CHARS} chars)")
+        return v
+
