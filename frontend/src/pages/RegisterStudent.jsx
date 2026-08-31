@@ -449,7 +449,7 @@ export default function RegisterStudent() {
                 <button
                   className="btn-secondary px-3 flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-400"
                   onClick={resetAllPhotos}
-                  title="Retake All"
+                  aria-label="Retake and reset all biometric photos"
                 >
                   <RotateCcw size={14} /> Reset
                 </button>
@@ -485,13 +485,13 @@ export default function RegisterStudent() {
                       <div className="relative w-full aspect-square mb-1">
                         <img
                           src={captured.frame}
-                          alt={guide.tag}
+                          alt={`Captured ${guide.tag} angle photo`}
                           className="w-full h-full object-cover rounded-lg border border-green-700/50"
                         />
                         <button
                           onClick={() => removePhoto(idx)}
                           className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-500 text-white rounded-full p-0.5 transition-colors shadow"
-                          title="Remove photo"
+                          aria-label={`Remove ${guide.tag} photo`}
                         >
                           <Trash2 size={10} />
                         </button>

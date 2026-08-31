@@ -28,9 +28,18 @@ web/dist/
 venv/
 env/
 
-# DB file (runtime data)
+# DB files (runtime data & sidecars)
 backend/classvision.db
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+test_classvision.db*
 
 .vscode/
 .idea/

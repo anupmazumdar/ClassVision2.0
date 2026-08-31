@@ -135,8 +135,8 @@ export default function Classroom() {
     }
   };
 
-  const handleDelete = async (id, title) => {
-    if (!confirm(`Delete "${title}"?`)) return;
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this study material/assignment?")) return;
     setDeletingId(id);
     try {
       await deleteMaterial(id);
@@ -520,9 +520,14 @@ export default function Classroom() {
       {/* POST MATERIAL MODAL (Teachers/Admins only) */}
       {modalOpen && isTeacherOrAdmin && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 my-auto max-h-[90vh] flex flex-col overflow-hidden">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="post-material-title"
+            className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 my-auto max-h-[90vh] flex flex-col overflow-hidden"
+          >
             <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
-              <h2 className="text-lg font-bold text-gray-100 flex items-center gap-2">
+              <h2 id="post-material-title" className="text-lg font-bold text-gray-100 flex items-center gap-2">
                 <Sparkles size={18} className="text-indigo-400" /> Post New Material / Assignment
               </h2>
               <button

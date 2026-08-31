@@ -152,17 +152,35 @@ export default function ChatAssistant() {
     ]);
   };
 
-  // Simple Markdown-like renderer (handles **bold**, *italic*, bullets, links)
+  // XSS-Safe Markdown-like renderer: Strictly escapes HTML special characters FIRST
+  const escapeHtml = (str) => {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
   const renderFormattedText = (text) => {
-    const lines = text.split("\n");
+    const lines = (text || "").split("\n");
     return lines.map((line, idx) => {
-      let formatted = line;
-      // Bold
-      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      // Inline Code
+      // 1. First escape all raw HTML so <script>, <img onerror>, etc. become harmless text
+      let formatted = escapeHtml(line);
+
+      // 2. Safely transform whitelisted markdown tags
+      // Bold **text**
+      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>');
+      // Italic *text*
+      formatted = formatted.replace(/\*([^\*]+)\*/g, '<em class="text-indigo-200">$1</em>');
+      // Inline Code `text`
       formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-gray-800 text-indigo-300 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>');
-      // Links
-      formatted = formatted.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-indigo-400 underline font-semibold">$1</a>');
+      // Safe Links [text](url) - only allows relative paths or https:// links
+      formatted = formatted.replace(/\[(.*?)\]\((.*?)\)/g, (match, linkText, url) => {
+        const isSafeUrl = url.startsWith("/") || url.startsWith("https://") || url.startsWith("http://");
+        const safeHref = isSafeUrl ? url : "#";
+        return `<a href="${safeHref}" target="${url.startsWith("http") ? "_blank" : "_self"}" rel="noreferrer" class="text-indigo-400 underline font-semibold hover:text-indigo-300">${linkText}</a>`;
+      });
 
       if (line.trim().startsWith("•") || line.trim().startsWith("-")) {
         return (

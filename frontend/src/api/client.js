@@ -3,7 +3,10 @@ import { getDeviceId } from "../utils/device";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
-const client = axios.create({ baseURL: BASE_URL });
+const client = axios.create({
+  baseURL: BASE_URL,
+  withCredentials: true, // Automatically sends httpOnly authentication cookies
+});
 
 export function getErrorMessage(err, fallback = "An error occurred. Please try again.") {
   if (!err) return fallback;
@@ -24,8 +27,8 @@ export function getErrorMessage(err, fallback = "An error occurred. Please try a
   return err.message || fallback;
 }
 
-// Token and user state are stored in sessionStorage as an interim XSS mitigation
-// (tokens are purged on tab close, avoiding persistent token harvesting).
+// HttpOnly cookies handle primary authentication.
+// Bearer header fallback is maintained if token is explicitly available.
 client.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("cv_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -38,7 +41,8 @@ client.interceptors.response.use(
     if (err.response?.status === 401) {
       sessionStorage.removeItem("cv_token");
       sessionStorage.removeItem("cv_user");
-      if (window.location.pathname !== "/login") {
+      // Avoid redirect loops if already on login or checkin
+      if (!window.location.pathname.includes("/login") && !window.location.pathname.includes("/checkin")) {
         window.location.href = "/login";
       }
     }
@@ -48,6 +52,9 @@ client.interceptors.response.use(
 
 export const login = (email, password) =>
   client.post("/auth/login", { email, password }).then((r) => r.data);
+
+export const logout = () =>
+  client.post("/auth/logout").then((r) => r.data).catch(() => ({}));
 
 export const getMe = () => client.get("/auth/me").then((r) => r.data);
 

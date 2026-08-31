@@ -1,3 +1,4 @@
+import html
 import re
 from typing import Any, Dict, List, Optional
 
@@ -253,9 +254,10 @@ def answer_assistant_query(query: str, history: Optional[List[Dict[str, str]]] =
         }
 
     # Fallback with helpful general response
+    safe_query = html.escape(query.strip()[:120])
     return {
         "reply": (
-            f"🤖 I searched our knowledge base for: *\"{query}\"*\n\n"
+            f"🤖 I searched our knowledge base for: *\"{safe_query}\"*\n\n"
             "Here is what you can do in **UEM ClassVision 2.0**:\n"
             "• **Self Check-in**: Visit `/checkin` with your 6-digit rolling code within 100m of the classroom.\n"
             "• **Classroom Hub**: Go to `/classroom` to access or publish Notes, PDFs, Assignments, and Tests.\n"

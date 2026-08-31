@@ -37,6 +37,9 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8000"))
 
+# Optional Distributed Redis Cache & Rate Limiter URL (e.g. redis://default:password@host:6379)
+REDIS_URL = os.getenv("REDIS_URL", "")
+
 DEFAULT_ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 DEFAULT_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@classvision.local")
 DEFAULT_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")

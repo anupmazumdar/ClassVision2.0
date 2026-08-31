@@ -57,3 +57,15 @@ def test_assistant_faqs_endpoint(client):
     faqs = res.json()
     assert len(faqs) >= 3
     assert any("Attendance" in cat["category"] for cat in faqs)
+
+
+def test_assistant_xss_sanitization(client):
+    xss_payload = "<script>alert('XSS')</script><img src=x onerror=alert(1)>"
+    res = client.post("/assistant/chat", json={"message": xss_payload})
+    assert res.status_code == 200
+    data = res.json()
+    # Ensure unescaped raw HTML script/img tags are NEVER present in the output
+    assert "<script>" not in data["reply"]
+    assert "<img" not in data["reply"]
+    assert "&lt;script&gt;" in data["reply"] or "alert" in data["reply"]
+

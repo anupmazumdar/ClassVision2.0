@@ -496,9 +496,17 @@ export default function Session() {
                 </div>
               )}
 
+              {/* Auto-scanning live pulse badge */}
+              {autoScan && (
+                <div className="absolute top-3 right-3 bg-amber-950/90 border border-amber-500/80 text-amber-300 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-md z-10 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span className="font-semibold">Auto-Scan Loop Active</span>
+                </div>
+              )}
+
               {/* Scanning status pill */}
               {scanning && (
-                <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md border border-indigo-500/50 text-indigo-300 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
+                <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md border border-indigo-500/50 text-indigo-300 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg z-10">
                   <Loader2 size={13} className="animate-spin text-indigo-400" /> Verifying Biometrics…
                 </div>
               )}
@@ -512,6 +520,7 @@ export default function Session() {
                     type="checkbox"
                     checked={livenessEnabled}
                     onChange={(e) => setLivenessEnabled(e.target.checked)}
+                    aria-label="Toggle anti-spoof burst liveness detection"
                     className="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-0"
                   />
                   <ShieldCheck size={14} className="text-green-400" />
@@ -521,7 +530,7 @@ export default function Session() {
                 <button
                   onClick={() => setSoundEnabled((s) => !s)}
                   className="flex items-center gap-1 hover:text-gray-200 transition-colors"
-                  title="Toggle Audio Feedback"
+                  aria-label={soundEnabled ? "Mute attendance sound chime" : "Unmute attendance sound chime"}
                 >
                   {soundEnabled ? (
                     <>
@@ -569,6 +578,7 @@ export default function Session() {
                 className="btn-primary flex-1 flex items-center justify-center gap-2 py-2.5"
                 onClick={handleScan}
                 disabled={scanning}
+                aria-label={scanMode === "kiosk" ? "Check-in student biometrically" : "Scan and mark attendance once"}
               >
                 {scanning ? (
                   <>
@@ -577,7 +587,7 @@ export default function Session() {
                 ) : (
                   <>
                     <CameraIcon size={15} />
-                    {scanMode === "kiosk" ? "Check-In Student" : "Scan & Mark Attendance"}
+                    {scanMode === "kiosk" ? "Check-In Student" : "Scan Once & Mark"}
                   </>
                 )}
               </button>
@@ -586,13 +596,14 @@ export default function Session() {
                 <button
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border ${
                     autoScan
-                      ? "bg-amber-700/40 border-amber-600 text-amber-300 hover:bg-amber-700/60"
+                      ? "bg-amber-700/40 border-amber-600 text-amber-300 hover:bg-amber-700/60 shadow-lg shadow-amber-900/30"
                       : "btn-secondary"
                   }`}
                   onClick={() => setAutoScan((a) => !a)}
+                  aria-label={autoScan ? "Turn off continuous auto-scanning" : "Turn on continuous auto-scanning"}
                 >
-                  <RefreshCw size={15} className={autoScan ? "animate-spin" : ""} />
-                  {autoScan ? "Auto-Scanning ON" : "Auto-Scanning OFF"}
+                  <RefreshCw size={15} className={autoScan ? "animate-spin text-amber-400" : ""} />
+                  {autoScan ? "Auto-Scanning ON (Live)" : "Enable Auto-Scan"}
                 </button>
               )}
             </div>

@@ -325,17 +325,38 @@ export default function Reports() {
 
       {/* Email modal */}
       {emailModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="card w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="send-report-title"
+            className="card w-full max-w-sm"
+          >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-100 flex items-center gap-2"><Mail size={16} className="text-indigo-400" /> Send Report</h2>
-              <button onClick={() => setEmailModal(false)} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+              <h2 id="send-report-title" className="font-semibold text-gray-100 flex items-center gap-2">
+                <Mail size={16} className="text-indigo-400" /> Send Report
+              </h2>
+              <button
+                onClick={() => setEmailModal(false)}
+                className="text-gray-500 hover:text-gray-300"
+                aria-label="Close send report modal"
+              >
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleEmail} className="space-y-3">
               <div>
-                <label className="label">Recipient Email</label>
-                <input className="input" type="email" placeholder="teacher@college.edu"
-                  value={emailTo} onChange={(e) => setEmailTo(e.target.value)} required autoFocus />
+                <label htmlFor="report-recipient-email" className="label">Recipient Email</label>
+                <input
+                  id="report-recipient-email"
+                  className="input"
+                  type="email"
+                  placeholder="teacher@college.edu"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  required
+                  autoFocus
+                />
               </div>
               {emailMsg && (
                 <p className={`text-sm px-3 py-2 rounded-lg border ${

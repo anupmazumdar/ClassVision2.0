@@ -22,3 +22,6 @@ fpdf2>=2.7.9
 # Testing & HTTP Test Client
 pytest>=7.4.0
 httpx>=0.25.0
+
+# Production Cache & Distributed Rate Limiting
+redis>=5.0.0

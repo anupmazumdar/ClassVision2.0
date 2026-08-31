@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { logout } from "../api/client";
 
 export const AuthContext = createContext(null);
 
@@ -11,8 +12,8 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }) {
-  // Token and user state are stored in sessionStorage as an interim XSS mitigation
-  // (tokens are purged on tab close, avoiding persistent cross-session harvesting).
+  // Non-sensitive user display profile is cached for instant render.
+  // Sensitive JWT auth is securely handled via httpOnly cookies.
   const [user, setUser] = useState(() => {
     try {
       const stored = sessionStorage.getItem("cv_user");
@@ -23,12 +24,17 @@ export function AuthProvider({ children }) {
   });
 
   const signIn = useCallback((userData, token) => {
-    sessionStorage.setItem("cv_token", token);
+    if (token) {
+      sessionStorage.setItem("cv_token", token);
+    }
     sessionStorage.setItem("cv_user", JSON.stringify(userData));
     setUser(userData);
   }, []);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    try {
+      await logout();
+    } catch (_) {}
     sessionStorage.removeItem("cv_token");
     sessionStorage.removeItem("cv_user");
     setUser(null);

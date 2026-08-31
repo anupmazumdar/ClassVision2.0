@@ -493,14 +493,20 @@ export default function Students() {
       {/* DEVICE SWITCH APPROVAL MODAL */}
       {deviceModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card w-full max-w-xl bg-gray-900 border-gray-800 shadow-2xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="device-requests-title"
+            className="card w-full max-w-lg bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[85vh] flex flex-col"
+          >
             <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
-              <h2 className="text-base font-bold text-gray-100 flex items-center gap-2">
-                <Smartphone size={17} className="text-amber-400" /> Student Device Switch Requests
+              <h2 id="device-requests-title" className="text-base font-bold text-gray-100 flex items-center gap-2">
+                <Smartphone size={17} className="text-amber-400" /> Pending Device Switch Requests ({deviceRequests.length})
               </h2>
               <button
                 onClick={() => setDeviceModalOpen(false)}
                 className="text-gray-400 hover:text-white p-1"
+                aria-label="Close device requests modal"
               >
                 ✕
               </button>
@@ -572,10 +578,15 @@ export default function Students() {
       {/* IMMUTABLE ACCESS & SECURITY AUDIT LOGS MODAL (Read-Only) */}
       {auditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
-          <div className="card w-full max-w-3xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] flex flex-col">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="audit-ledger-title"
+            className="card w-full max-w-3xl bg-gray-900 border-gray-800 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] flex flex-col"
+          >
             <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
               <div>
-                <h2 className="text-base font-bold text-gray-100 flex items-center gap-2">
+                <h2 id="audit-ledger-title" className="text-base font-bold text-gray-100 flex items-center gap-2">
                   <History size={17} className="text-emerald-400" /> Immutable Access & Security Audit Ledger
                 </h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">
@@ -585,6 +596,7 @@ export default function Students() {
               <button
                 onClick={() => setAuditModalOpen(false)}
                 className="text-gray-400 hover:text-white p-1"
+                aria-label="Close audit ledger modal"
               >
                 ✕
               </button>

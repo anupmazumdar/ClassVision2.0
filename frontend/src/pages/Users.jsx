@@ -104,6 +104,7 @@ export default function Users() {
                       <button
                         onClick={() => handleDelete(u.id, u.name)}
                         disabled={deleting === u.id}
+                        aria-label={`Delete user ${u.name}`}
                         className="text-gray-600 hover:text-red-400 transition-colors p-1"
                       >
                         {deleting === u.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -119,30 +120,35 @@ export default function Users() {
 
       {/* Add user modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="card w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-user-modal-title"
+            className="card w-full max-w-md"
+          >
+            <h2 id="add-user-modal-title" className="text-lg font-semibold mb-4 flex items-center gap-2">
               <UserCog size={18} className="text-indigo-400" /> Add User
             </h2>
             <form onSubmit={handleAdd} className="space-y-4">
               <div>
-                <label className="label">Full Name *</label>
-                <input className="input" placeholder="e.g. Dr. Sharma" value={form.name}
+                <label htmlFor="user-name" className="label">Full Name *</label>
+                <input id="user-name" className="input" placeholder="e.g. Dr. Sharma" value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div>
-                <label className="label">Email *</label>
-                <input className="input" type="email" placeholder="teacher@college.edu" value={form.email}
+                <label htmlFor="user-email" className="label">Email *</label>
+                <input id="user-email" className="input" type="email" placeholder="teacher@college.edu" value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
               <div>
-                <label className="label">Password *</label>
-                <input className="input" type="password" placeholder="Min 6 characters" value={form.password}
+                <label htmlFor="user-password" className="label">Password *</label>
+                <input id="user-password" className="input" type="password" placeholder="Min 6 characters" value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
               </div>
               <div>
-                <label className="label">Role</label>
-                <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                <label htmlFor="user-role" className="label">Role</label>
+                <select id="user-role" className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                   <option value="teacher">Teacher</option>
                   <option value="admin">Admin</option>
                 </select>

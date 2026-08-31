@@ -181,13 +181,19 @@ export default function Dashboard() {
 
       {/* New session modal */}
       {startForm.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="card w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4 text-gray-100">Start New Session</h2>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-session-title"
+            className="card w-full max-w-md"
+          >
+            <h2 id="start-session-title" className="text-lg font-semibold mb-4 text-gray-100">Start New Session</h2>
             <form onSubmit={handleStart} className="space-y-4">
               <div>
-                <label className="label">Subject *</label>
+                <label htmlFor="session-subject" className="label">Subject *</label>
                 <input
+                  id="session-subject"
                   className="input"
                   placeholder="e.g. Mathematics 301"
                   value={startForm.subject}
@@ -197,8 +203,9 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <label className="label">Room (optional)</label>
+                <label htmlFor="session-room" className="label">Room (optional)</label>
                 <input
+                  id="session-room"
                   className="input"
                   placeholder="e.g. Room 204"
                   value={startForm.room}
