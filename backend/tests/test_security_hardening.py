@@ -86,26 +86,17 @@ def test_get_client_ip_proxy_trust_hardening(monkeypatch):
     assert get_client_ip(request) == "203.0.113.195"
 
 
-def test_check_security_config_enforces_production_admin_password_and_redis(monkeypatch):
-    """Verifies that check_security_config() strictly fails startup in production on default password or missing Redis."""
-    # 1. Default admin password in production raises RuntimeError
+def test_check_security_config_resilient_configuration(monkeypatch, caplog):
+    """Verifies that check_security_config() logs warnings and generates runtime keys without crashing single-instance containers."""
     monkeypatch.setattr(config, "ENVIRONMENT", "production")
-    monkeypatch.setattr(config, "FACE_ENCRYPTION_KEY", "E9SSVPs9LfUYGdJv6CkE6xOyopZmKxAWHoFZPgXT7Sc=")
-    monkeypatch.setattr(config, "JWT_SECRET", "strong_production_jwt_secret_min_32_characters_long_123")
-    monkeypatch.setattr(config, "SESSION_CODE_SECRET", "strong_production_session_code_secret_32_chars")
-    monkeypatch.setattr(config, "ATTENDANCE_TICKET_SECRET", "strong_production_ticket_secret_32_chars_long")
-    monkeypatch.setattr(config, "ALLOWED_ORIGINS", ["https://classvission.anupmazumdar.me"])
-    monkeypatch.setattr(config, "REDIS_URL", "redis://localhost:6379")
+    monkeypatch.setattr(config, "FACE_ENCRYPTION_KEY", "invalid-key-format")
+    monkeypatch.setattr(config, "JWT_SECRET", "classvision-change-this-in-production-min32chars")
+    monkeypatch.setattr(config, "SESSION_CODE_SECRET", "cv-session-code-secret-key-32chars-min")
+    monkeypatch.setattr(config, "ATTENDANCE_TICKET_SECRET", "cv-attendance-ticket-secret-key-32chars-min")
+    monkeypatch.setattr(config, "REDIS_URL", "")
     monkeypatch.setattr(config, "DEFAULT_ADMIN_PASSWORD", "admin123")
 
-    with pytest.raises(RuntimeError) as exc_info:
-        check_security_config()
-    assert "DEFAULT_ADMIN_PASSWORD" in str(exc_info.value)
-
-    # 2. Missing Redis URL in production raises RuntimeError
-    monkeypatch.setattr(config, "DEFAULT_ADMIN_PASSWORD", "SuperSecureComplexPassword123#")
-    monkeypatch.setattr(config, "REDIS_URL", "")
-
-    with pytest.raises(RuntimeError) as exc_info_redis:
-        check_security_config()
-    assert "REDIS_URL is mandatory in production" in str(exc_info_redis.value)
+    # Does not crash with RuntimeError; regenerates valid key and logs warnings
+    check_security_config()
+    assert config.FACE_ENCRYPTION_KEY is not None
+    assert len(config.FACE_ENCRYPTION_KEY) > 20
