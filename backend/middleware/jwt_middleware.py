@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from config import JWT_ALGORITHM, JWT_SECRET, TOKEN_EXPIRE_HOURS
+from utils.time import utc_now
 
 SECRET_KEY = JWT_SECRET
 ALGORITHM = JWT_ALGORITHM
@@ -34,7 +35,7 @@ def create_token(user_id: int, email: str, role: str, name: str) -> str:
         "email": email,
         "role": role,
         "name": name,
-        "exp": datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),
+        "exp": utc_now() + timedelta(hours=TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

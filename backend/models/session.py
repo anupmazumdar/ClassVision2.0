@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 
+from utils.time import utc_now
 from .base import Base
 
 
@@ -12,8 +11,8 @@ class ClassSession(Base):
     subject = Column(String, nullable=False)
     room = Column(String, default="")
     teacher_id = Column(Integer, ForeignKey("users.id"))
-    started_at = Column(DateTime, default=datetime.utcnow)
-    ended_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), default=utc_now)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
 
     # Security & Geofencing fields

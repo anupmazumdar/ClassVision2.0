@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from sqlalchemy import Column, DateTime, Integer, String
 
+from utils.time import utc_now
 from .base import Base
 
 
@@ -13,4 +12,4 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, default="teacher")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)

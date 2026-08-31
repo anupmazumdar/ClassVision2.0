@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer
 
+from utils.time import utc_now
 from .base import Base
 
 
@@ -12,4 +11,4 @@ class AttendanceRecord(Base):
     session_id = Column(Integer, ForeignKey("sessions.id"))
     student_id = Column(Integer, ForeignKey("students.id"))
     confidence = Column(Float, default=0.0)
-    marked_at = Column(DateTime, default=datetime.utcnow)
+    marked_at = Column(DateTime(timezone=True), default=utc_now)

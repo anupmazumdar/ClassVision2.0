@@ -1,9 +1,9 @@
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from models import ClassSession
+from utils.time import utc_now
 
 
 def list_recent_sessions(db: Session, limit: int = 50):
@@ -14,7 +14,7 @@ def close_active_sessions_for_teacher(db: Session, teacher_id: int) -> None:
     db.query(ClassSession).filter(
         ClassSession.teacher_id == teacher_id,
         ClassSession.is_active == True,
-    ).update({"is_active": False, "ended_at": datetime.utcnow()})
+    ).update({"is_active": False, "ended_at": utc_now()})
 
 
 def create_session(
@@ -49,7 +49,7 @@ def get_session_by_id(db: Session, session_id: int):
 
 def stop_session(db: Session, session: ClassSession) -> None:
     session.is_active = False
-    session.ended_at = datetime.utcnow()
+    session.ended_at = utc_now()
     db.commit()
 
 
