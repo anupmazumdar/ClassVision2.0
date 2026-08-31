@@ -35,6 +35,7 @@ jobs:
       - name: Run Pytest Suite with Coverage
         working-directory: backend
         env:
+          PYTHONPATH: .
           ENVIRONMENT: testing
           JWT_SECRET: test_jwt_secret_min_32_characters_long_123456
           SESSION_CODE_SECRET: test_session_code_secret_min_32_characters_long_123456
