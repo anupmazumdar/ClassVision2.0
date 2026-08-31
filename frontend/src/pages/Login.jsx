@@ -307,7 +307,15 @@ export default function Login() {
             </form>
           )}
 
-          <div className="mt-5 pt-4 border-t border-gray-800 text-center">
+          <div className="mt-5 pt-4 border-t border-gray-800 space-y-3 text-center">
+            <div className="p-2.5 bg-gray-950/60 border border-gray-800 rounded-lg text-left text-xs text-gray-400 space-y-1">
+              <span className="font-semibold text-gray-300">Default Admin Credentials:</span>
+              <div className="flex items-center justify-between font-mono text-[11px] text-indigo-300">
+                <span>admin@classvision.local</span>
+                <span className="text-gray-400">Password: <strong className="text-indigo-300">admin123</strong></span>
+              </div>
+            </div>
+
             <Link
               to="/checkin"
               className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400"

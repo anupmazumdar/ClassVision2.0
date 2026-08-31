@@ -56,7 +56,7 @@ AUTH_MODE = os.getenv("AUTH_MODE", "cookie").lower()
 DEFAULT_ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 DEFAULT_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@classvision.local")
 DEFAULT_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-ADMIN_ALIAS_EMAIL = os.getenv("ADMIN_ALIAS_EMAIL", "")
+ADMIN_ALIAS_EMAIL = os.getenv("ADMIN_ALIAS_EMAIL", "admin@classvission.local")
 
 # CORS Origin Allow-list
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")

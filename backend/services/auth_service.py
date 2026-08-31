@@ -11,6 +11,12 @@ from services import audit_service
 def login(db: Session, email: str, password: str) -> dict:
     cleaned_email = email.strip().lower() if email else ""
     user = user_repo.get_user_by_email(db, cleaned_email)
+    if not user and cleaned_email in ("admin@classvission.local", "admin@classvision.local", "admin"):
+        from config import ADMIN_ALIAS_EMAIL, DEFAULT_ADMIN_EMAIL
+        user = user_repo.get_user_by_email(db, DEFAULT_ADMIN_EMAIL.strip().lower()) or (
+            user_repo.get_user_by_email(db, ADMIN_ALIAS_EMAIL.strip().lower()) if ADMIN_ALIAS_EMAIL else None
+        )
+
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
