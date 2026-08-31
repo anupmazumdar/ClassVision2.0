@@ -28,6 +28,8 @@ from services import auth_service
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     check_security_config()
+    # In production, database schema migrations are managed via Alembic:
+    # alembic upgrade head
     init_db()
     db = SessionLocal()
     try:

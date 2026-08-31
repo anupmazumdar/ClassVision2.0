@@ -48,7 +48,7 @@ This generates 4 high-entropy decoupled keys:
 2. Set Root Directory to `backend` (or select the root `Dockerfile`).
 3. Set the Build & Start commands:
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Start Command:** `alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT`
 4. In the **Environment Variables** tab, add:
    ```ini
    ENVIRONMENT=production

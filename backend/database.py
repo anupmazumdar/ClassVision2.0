@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -35,31 +36,9 @@ def get_db():
 
 
 def init_db():
+    """Initializes tables for development/testing environments.
+
+    In production deployments, manage declarative schema updates via Alembic:
+        alembic upgrade head
+    """
     Base.metadata.create_all(bind=engine)
-
-    # Safe auto-migration for SQLite columns (dev/local environment)
-    if DATABASE_URL.startswith("sqlite"):
-        with engine.connect() as conn:
-            try:
-                result = conn.exec_driver_sql("PRAGMA table_info(sessions)").fetchall()
-                existing_cols = {row[1] for row in result}
-                if "room_lat" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN room_lat FLOAT")
-                if "room_lng" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN room_lng FLOAT")
-                if "radius_meters" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN radius_meters FLOAT DEFAULT 100.0")
-                if "require_code" not in existing_cols:
-                    conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN require_code BOOLEAN DEFAULT 0")
-
-                st_result = conn.exec_driver_sql("PRAGMA table_info(students)").fetchall()
-                st_cols = {row[1] for row in st_result}
-                if "device_id" not in st_cols:
-                    conn.exec_driver_sql("ALTER TABLE students ADD COLUMN device_id VARCHAR")
-                if "consent_given" not in st_cols:
-                    conn.exec_driver_sql("ALTER TABLE students ADD COLUMN consent_given BOOLEAN DEFAULT 0")
-                if "consent_at" not in st_cols:
-                    conn.exec_driver_sql("ALTER TABLE students ADD COLUMN consent_at DATETIME")
-                conn.commit()
-            except Exception:
-                pass

@@ -32,7 +32,23 @@ cp .env.example .env
 # Edit .env — change JWT_SECRET and ADMIN_PASSWORD
 ```
 
-### 4. Run the backend
+### 4. Database Migrations (Alembic)
+ClassVision uses Alembic for declarative, version-controlled schema migrations across SQLite and PostgreSQL:
+```bash
+# Apply migrations to head
+alembic upgrade head
+```
+
+When modifying models (`models/`):
+```bash
+# 1. Generate new migration script
+alembic revision --autogenerate -m "describe schema changes"
+
+# 2. Apply migration
+alembic upgrade head
+```
+
+### 5. Run the backend
 ```bash
 python main.py
 # Server starts at http://localhost:8000
