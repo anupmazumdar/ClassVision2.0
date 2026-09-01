@@ -31,8 +31,11 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from middleware.security_headers import SecurityHeadersMiddleware
 from services import auth_service
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logger = logging.getLogger("classvision.api")
 
@@ -58,6 +61,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ClassVision API", version="2.0.0", lifespan=lifespan)
+
+# Register SlowAPI Limiter state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Add OWASP standard security response headers
 app.add_middleware(SecurityHeadersMiddleware)

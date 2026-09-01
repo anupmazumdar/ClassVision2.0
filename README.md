@@ -37,6 +37,8 @@ ClassVision 2.0 is a **high-security, bypass-resistant AI attendance system** en
    - Student accounts bind to their registered device on first check-in; unauthorized proxy attempts from foreign devices are rejected (`HTTP 403`).
 8. **Strict Role-Based Access Control (RBAC)**:
    - `POST /students`, `POST /students/{id}/register-face`, `GET /reports/*`, `POST /reports/*/email` guarded by `require_teacher_or_admin` to prevent unauthorized face overwrites, data scraping, and SMTP relays.
+9. **Endpoint-Level Rate Limiting & Cooldowns (SlowAPI)**:
+   - Dedicated SlowAPI rate limiting protects auth endpoints (`/auth/login`, `/auth/student-login` at 20 req/min) and attendance check-in endpoints (`/attendance/self-checkin`, `/attendance/{session_id}/scan-and-mark` at 60 req/min) against credential stuffing and bot spamming.
 
 ---
 

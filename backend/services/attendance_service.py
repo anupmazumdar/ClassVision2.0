@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import math
 import secrets
 import time
@@ -15,6 +16,8 @@ from middleware.jwt_middleware import check_code_rate_limit, check_device_checki
 from repositories import attendance_repo, session_repo, student_repo
 from .face_service import decode_image, recognize_faces, verify_liveness
 from .session_service import verify_session_code
+
+logger = logging.getLogger("classvision.attendance")
 
 # In-memory student last-known GPS location tracker: student_id -> (lat, lon, timestamp)
 _STUDENT_LAST_KNOWN_GPS: dict[int, tuple[float, float, float]] = {}
@@ -230,6 +233,7 @@ def scan_and_mark_atomic(
     # 2. Geofencing Check
     if session.room_lat is not None and session.room_lng is not None:
         if lat is None or lng is None:
+            logger.warning("Geofence check failed: missing GPS coordinates for session_id=%d", session_id)
             raise HTTPException(
                 status_code=403,
                 detail="Geofence check failed: Device GPS coordinates are required for this session.",
@@ -237,6 +241,7 @@ def scan_and_mark_atomic(
         distance = calculate_haversine_distance(lat, lng, session.room_lat, session.room_lng)
         max_allowed = session.radius_meters or 100.0
         if distance > max_allowed:
+            logger.warning("Geofence violation: session_id=%d, distance=%.1fm, max_allowed=%.1fm", session_id, distance, max_allowed)
             raise HTTPException(
                 status_code=403,
                 detail=f"Geofence check failed: You are {distance:.1f}m away from class (allowed radius: {max_allowed}m).",
@@ -387,6 +392,7 @@ def mark_attendance_with_ticket(
     # 3. Geofencing Verification
     if session.room_lat is not None and session.room_lng is not None:
         if lat is None or lng is None:
+            logger.warning("Geofence check failed: missing GPS for student_id=%d, session_id=%d", student_id, session_id)
             raise HTTPException(
                 status_code=403,
                 detail="Geofence check failed: Device GPS coordinates are required for this session.",
@@ -396,6 +402,7 @@ def mark_attendance_with_ticket(
         )
         max_allowed = session.radius_meters or 100.0
         if distance > max_allowed:
+            logger.warning("Geofence violation: student_id=%d, session_id=%d, distance=%.1fm, max_allowed=%.1fm", student_id, session_id, distance, max_allowed)
             raise HTTPException(
                 status_code=403,
                 detail=f"Geofence check failed: You are {distance:.1f}m away from class (allowed radius: {max_allowed}m).",
@@ -404,11 +411,13 @@ def mark_attendance_with_ticket(
     # 4. Device ID Binding Verification
     if device_id:
         if student.device_id and student.device_id != device_id:
+            logger.warning("Proxy check-in blocked (device mismatch): student_id=%d, bound_device='%s', attempt_device='%s'", student_id, student.device_id, device_id)
             raise HTTPException(
                 status_code=403,
                 detail="Device mismatch: Student is registered to another device. Proxy check-ins are blocked.",
             )
         elif not student.device_id:
+            logger.info("Student device auto-bound on first attendance: student_id=%d, device_id='%s'", student_id, device_id)
             student_repo.bind_student_device(db, student, device_id)
 
     # 5. Check if already marked
@@ -510,6 +519,7 @@ def self_checkin_by_student(
     distance_meters = None
     if matched_session.room_lat is not None and matched_session.room_lng is not None:
         if lat is None or lng is None:
+            logger.warning("Geofence check failed on self-checkin: missing GPS for session_id=%d", matched_session.id)
             raise HTTPException(
                 status_code=403,
                 detail="Classroom Geofencing is active. Please enable GPS location on your device to check in.",
@@ -519,6 +529,7 @@ def self_checkin_by_student(
         )
         max_allowed = matched_session.radius_meters or 100.0
         if distance_meters > max_allowed:
+            logger.warning("Geofence violation on self-checkin: session_id=%d, distance=%.1fm, max_allowed=%.1fm", matched_session.id, distance_meters, max_allowed)
             raise HTTPException(
                 status_code=403,
                 detail=f"Geofence check failed: You are {int(distance_meters)}m away from the classroom (allowed radius: {int(max_allowed)}m). You must be present inside the classroom to check in.",
@@ -544,12 +555,13 @@ def self_checkin_by_student(
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to process burst frames: {e}")
 
-    primary_img_b64 = image or frames[0]
+    primary_img_b64 = image or (frames[0] if frames else None)
     img_bgr = decode_image(primary_img_b64)
     all_students = student_repo.list_students(db)
     recognized = recognize_faces(img_bgr, all_students)
 
     if not recognized or len(recognized) == 0:
+        logger.warning("Self-checkin face not recognized for session_id=%d", matched_session.id)
         raise HTTPException(
             status_code=400,
             detail="Face not recognized. Please ensure your face is well-lit and clearly centered, or verify you are registered in the student database.",
@@ -560,6 +572,7 @@ def self_checkin_by_student(
 
     # Student caller authorization check
     if caller_student_id is not None and matched_student_id != caller_student_id:
+        logger.warning("Caller student authorization mismatch: caller_student_id=%d, matched_student_id=%d", caller_student_id, matched_student_id)
         raise HTTPException(
             status_code=403,
             detail="Security Violation: Recognized face does not match the logged-in student account.",
@@ -573,11 +586,13 @@ def self_checkin_by_student(
     if device_id:
         check_device_checkin_velocity(device_id, matched_student_id, max_distinct_students=3, window_seconds=300)
         if student.device_id and student.device_id != device_id:
+            logger.warning("Proxy check-in blocked on self-checkin: student_id=%d, bound_device='%s', attempt_device='%s'", matched_student_id, student.device_id, device_id)
             raise HTTPException(
                 status_code=403,
                 detail=f"Device mismatch: Your student profile ({student.name}) is registered to another device. Proxy check-ins from multiple devices are blocked.",
             )
         elif not student.device_id:
+            logger.info("Student device auto-bound on self-checkin: student_id=%d, device_id='%s'", matched_student_id, device_id)
             student_repo.bind_student_device(db, student, device_id)
 
     if lat is not None and lng is not None:
@@ -605,6 +620,7 @@ def self_checkin_by_student(
         student_id=matched_student_id,
         confidence=top_match["confidence"],
     )
+    logger.info("Self-checkin verified successfully: student_id=%d, session_id=%d, confidence=%.2f", matched_student_id, matched_session.id, top_match["confidence"])
 
     return {
         "message": f"Attendance successfully marked for {student.name}!",

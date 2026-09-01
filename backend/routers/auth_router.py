@@ -12,6 +12,7 @@ from middleware.jwt_middleware import (
     require_admin,
     revoke_token,
 )
+from middleware.rate_limiter import limiter
 from schemas.auth_schema import LoginRequest, RegisterRequest, StudentLoginRequest
 from services import auth_service
 
@@ -42,6 +43,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/login")
+@limiter.limit("20/minute")
 def login(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
     client_ip = get_client_ip(request)
     check_login_rate_limit(client_ip)
@@ -60,6 +62,7 @@ def login(request: Request, response: Response, body: LoginRequest, db: Session 
 
 
 @router.post("/student-login")
+@limiter.limit("20/minute")
 def student_login(request: Request, response: Response, body: StudentLoginRequest, db: Session = Depends(get_db)):
     client_ip = get_client_ip(request)
     check_login_rate_limit(client_ip)

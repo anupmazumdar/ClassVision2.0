@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import logging
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -9,6 +10,8 @@ from fastapi import HTTPException
 from PIL import Image
 
 from config import FACE_SIMILARITY_THRESHOLD
+
+logger = logging.getLogger("classvision.liveness")
 
 _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 _FACE_SIZE = (64, 64)
@@ -237,6 +240,7 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
 
     # Static photo check: exact duplicate frames (pixel delta < 0.6)
     if avg_diff < 0.6:
+        logger.warning("Liveness verification rejected: static photo detected (motion_delta=%.2f)", avg_diff)
         return {
             "is_live": False,
             "score": round(avg_diff, 2),
@@ -245,6 +249,7 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
 
     # Extreme motion/scene switch check
     if avg_diff > 120.0:
+        logger.warning("Liveness verification rejected: extreme motion/scene switch (motion_delta=%.2f)", avg_diff)
         return {
             "is_live": False,
             "score": round(avg_diff, 2),
@@ -256,12 +261,14 @@ def verify_liveness(frames: List[np.ndarray]) -> Dict:
     avg_lap = sum(lap_vars) / len(lap_vars)
 
     if avg_lap < 15.0:
+        logger.warning("Liveness verification rejected: image too blurry (laplacian_var=%.2f)", avg_lap)
         return {
             "is_live": False,
             "score": round(avg_lap, 2),
             "reason": "Image too blurry or degraded for anti-spoofing verification.",
         }
 
+    logger.info("Liveness verification passed: motion_score=%.2f, texture_score=%.2f", avg_diff, avg_lap)
     return {
         "is_live": True,
         "motion_score": round(avg_diff, 2),

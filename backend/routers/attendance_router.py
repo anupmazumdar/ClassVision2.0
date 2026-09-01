@@ -8,6 +8,7 @@ from middleware.jwt_middleware import (
     get_current_user,
     require_teacher_or_admin,
 )
+from middleware.rate_limiter import limiter
 from schemas.attendance_schema import ManualMarkRequest, MarkRequest, RecognizeRequest, ScanAndMarkRequest, SelfCheckinRequest
 from services import attendance_service
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
 @router.post("/self-checkin", status_code=200)
+@limiter.limit("60/minute")
 def student_self_checkin(
     request: Request,
     body: SelfCheckinRequest,
@@ -46,6 +48,7 @@ def student_self_checkin(
 
 
 @router.post("/recognize")
+@limiter.limit("60/minute")
 def recognize(
     request: Request,
     body: RecognizeRequest,
@@ -73,6 +76,7 @@ def recognize(
 
 
 @router.post("/{session_id}/scan-and-mark", status_code=200)
+@limiter.limit("60/minute")
 def scan_and_mark(
     session_id: int,
     request: Request,
@@ -100,6 +104,7 @@ def scan_and_mark(
 
 
 @router.post("/{session_id}/mark", status_code=201)
+@limiter.limit("60/minute")
 def mark_attendance(
     session_id: int,
     request: Request,

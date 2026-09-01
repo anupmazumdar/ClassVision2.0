@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from auth import create_token, hash_password, verify_password
 from middleware.jwt_middleware import create_student_token
 from repositories import student_repo, user_repo
 from services import audit_service
+
+logger = logging.getLogger("classvision.auth")
 
 
 def login(db: Session, email: str, password: str) -> dict:
@@ -18,9 +21,11 @@ def login(db: Session, email: str, password: str) -> dict:
         )
 
     if not user or not verify_password(password, user.password_hash):
+        logger.warning("User authentication failed: invalid credentials for email='%s'", cleaned_email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_token(user.id, user.email, user.role, user.name)
+    logger.info("User authenticated successfully: user_id=%d, email='%s', role='%s'", user.id, user.email, user.role)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -50,6 +55,7 @@ def student_login(
 
     student = student_repo.get_student_by_enrollment(db, clean_enrollment)
     if not student:
+        logger.warning("Student login failed: enrollment='%s' not found (device_id='%s', ip='%s')", clean_enrollment, device_id, client_ip)
         audit_service.record_audit_event(
             db=db,
             event_type="UNREGISTERED_STUDENT_LOGIN_ATTEMPT",
@@ -72,6 +78,7 @@ def student_login(
             db.commit()
 
     if not pin_valid:
+        logger.warning("Student login failed: invalid PIN for enrollment='%s' (device_id='%s', ip='%s')", clean_enrollment, device_id, client_ip)
         audit_service.record_audit_event(
             db=db,
             event_type="STUDENT_LOGIN_PIN_FAILED",
@@ -84,11 +91,13 @@ def student_login(
         raise HTTPException(status_code=401, detail="Invalid enrollment number or PIN")
 
     if student.status != "active":
+        logger.warning("Student login blocked: account status='%s' for enrollment='%s'", student.status, student.enrollment)
         raise HTTPException(status_code=403, detail=f"Student account is currently {student.status}.")
 
     # 1. Check if device is already locked to another student
     other_student = student_repo.get_student_by_device_id(db, device_id)
     if other_student and other_student.id != student.id:
+        logger.warning("Student device conflict: device_id='%s' already bound to '%s', attempted by '%s'", device_id, other_student.enrollment, student.enrollment)
         student_repo.request_device_switch(db, student, device_id, device_info)
         audit_service.record_audit_event(
             db=db,
@@ -111,6 +120,7 @@ def student_login(
     # 2. Check student's own device binding
     if not student.device_id:
         # First-time device binding
+        logger.info("Student first-time device binding: enrollment='%s', device_id='%s'", student.enrollment, device_id)
         student_repo.bind_student_device(db, student, device_id)
         audit_service.record_audit_event(
             db=db,
@@ -123,6 +133,7 @@ def student_login(
         )
     elif student.device_id != device_id:
         # Student attempting login from an unapproved second device
+        logger.warning("Student unapproved second device detected: enrollment='%s', registered='%s', attempting='%s'", student.enrollment, student.device_id, device_id)
         if student.device_approval_status == "pending_approval":
             raise HTTPException(
                 status_code=403,
@@ -154,6 +165,7 @@ def student_login(
         year=student.year or 1,
     )
 
+    logger.info("Student authenticated successfully: student_id=%d, enrollment='%s', device_id='%s'", student.id, student.enrollment, device_id)
     audit_service.record_audit_event(
         db=db,
         event_type="STUDENT_LOGIN_SUCCESS",

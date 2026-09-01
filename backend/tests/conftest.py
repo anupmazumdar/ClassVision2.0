@@ -28,6 +28,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 @pytest.fixture(autouse=True)
 def reset_rate_limiters():
     from middleware import jwt_middleware
+    from middleware.rate_limiter import limiter
     from services import attendance_service
     jwt_middleware._LOGIN_ATTEMPTS.clear()
     jwt_middleware._CODE_ATTEMPTS.clear()
@@ -36,6 +37,7 @@ def reset_rate_limiters():
     jwt_middleware._DEVICE_CHECKIN_VELOCITY.clear()
     jwt_middleware._REVOKED_TOKENS.clear()
     attendance_service._STUDENT_LAST_KNOWN_GPS.clear()
+    limiter.reset()
     yield
     jwt_middleware._LOGIN_ATTEMPTS.clear()
     jwt_middleware._CODE_ATTEMPTS.clear()
@@ -44,6 +46,7 @@ def reset_rate_limiters():
     jwt_middleware._DEVICE_CHECKIN_VELOCITY.clear()
     jwt_middleware._REVOKED_TOKENS.clear()
     attendance_service._STUDENT_LAST_KNOWN_GPS.clear()
+    limiter.reset()
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -11,7 +11,7 @@ cryptography==50.0.0
 # Web Framework & ASGI Server
 fastapi==0.129.0
 uvicorn[standard]==0.40.0
-python-multipart==0.0.22
+python-multipart==0.0.32
 email-validator==2.3.0
 
 # Database ORM & Migrations
@@ -20,7 +20,7 @@ alembic==1.19.1
 
 # Biometrics & Image Processing
 numpy==2.4.2
-Pillow==12.1.1
+Pillow==12.3.0
 opencv-python-headless==4.13.0.92
 
 # Reports & File Generation
@@ -28,10 +28,11 @@ openpyxl==3.1.5
 fpdf2==2.8.7
 
 # Environment & Configuration
-python-dotenv==1.2.1
+python-dotenv==1.2.3
 
 # Distributed Caching & Rate Limiting
 redis==8.1.0
+slowapi==0.1.10
 
 # Testing & Client Tooling
 pytest==9.1.1

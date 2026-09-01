@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(..., max_length=255)
-    password: str
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=255)
 
     @field_validator("email")
     @classmethod
@@ -18,8 +18,8 @@ class LoginRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    email: str = Field(..., max_length=255)
-    password: str = Field(..., min_length=8)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=255)
     role: Literal["admin", "teacher"] = "teacher"
 
     @field_validator("email")
@@ -33,7 +33,7 @@ class RegisterRequest(BaseModel):
 
 class StudentLoginRequest(BaseModel):
     enrollment: str = Field(..., min_length=1, max_length=100)
-    pin: str = Field(..., min_length=4, max_length=6, description="4-6 digit second-factor security PIN")
+    pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d{4,6}$", description="4-6 digit second-factor security PIN")
     device_id: str = Field(..., min_length=1, max_length=255)
     device_info: str = Field(default="Web/Mobile Browser", max_length=255)
 
